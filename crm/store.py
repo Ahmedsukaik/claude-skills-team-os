@@ -129,8 +129,10 @@ class CRM:
         self.counters[prefix] = self.counters.get(prefix, 0) + 1
         return f"{prefix}-{self.counters[prefix]}"
 
-    def write_log(self, actor: str, action: str, detail: str, outcome: str = "ok") -> None:
-        self.log.append({"at": self.now(), "actor": actor, "action": action, "detail": detail[:300], "outcome": outcome})
+    def write_log(self, actor: str, action: str, detail: str, outcome: str = "ok", ref: str = "") -> None:
+        """detail is plain words; ref holds the record and write ids involved."""
+        self.log.append({"at": self.now(), "actor": actor, "action": action, "detail": detail[:300], "outcome": outcome,
+                         "ref": ref[:120]})
 
     def label(self, record_id: str | None) -> str:
         rec = self.record(record_id) if record_id else None
@@ -195,10 +197,10 @@ class CRM:
     def get(self, actor: str, record_id: str) -> dict[str, Any]:
         rec = self.record(record_id) if isinstance(record_id, str) and ID.match(record_id) else None
         if rec is None:
-            self.write_log(actor, "open record", f"{record_id}: not found", "refused")
+            self.write_log(actor, "open record", "not found", "refused", str(record_id)[:40])
             raise CRMError("not_found", f"There is no record {record_id}. Use an id from a search.")
         out = self._full(record_id, rec)
-        self.write_log(actor, "open record", f"{record_id} {self.label(record_id)}")
+        self.write_log(actor, "open record", self.label(record_id), ref=record_id)
         return out
 
     def _notes_for(self, key: str, value: str, n: int = 3) -> list[dict[str, Any]]:
@@ -251,7 +253,7 @@ class CRM:
         order = {s: i for i, s in enumerate(data.STAGES)}
         deals.sort(key=lambda d: (order[d["stage"]], d["id"]))
         by_stage = {s: sum(1 for d in deals if d["stage"] == s) for s in data.STAGES}
-        out = {"as_of": self.today.isoformat(), "stale_rule": f"an open deal with no logged activity for {data.STALE_DAYS} "
+        out: dict[str, Any] = {"as_of": self.today.isoformat(), "stale_rule": f"an open deal with no logged activity for {data.STALE_DAYS} "
                "days or more", "by_stage": by_stage, "open_deals": sum(by_stage[s] for s in data.OPEN_STAGES),
                "stale_deals": [d["id"] for d in deals if d["stale"]], "deals": deals}
         self.write_log(actor, "read pipeline", f"{len(deals)} deals, {len(out['stale_deals'])} stale")
@@ -272,7 +274,8 @@ class CRM:
     def calendar(self, actor: str, days_ahead: int = 7, contact_id: str | None = None) -> list[dict[str, Any]]:
         days_ahead = max(0, min(int(days_ahead), 31))
         events = [self._event(e) for e in self._events(days_ahead) if not contact_id or contact_id in e["contact_ids"]]
-        self.write_log(actor, "read calendar", f"next {days_ahead} days" + (f" for {contact_id}" if contact_id else "")
+        who = f" with {self.contacts[contact_id]['name']}" if contact_id in self.contacts else ""
+        self.write_log(actor, "read calendar", f"next {days_ahead} days{who}"
                        + f": {len(events)} events")
         return events
 
@@ -289,7 +292,7 @@ class CRM:
         draft = {"id": self._next("M"), "to": contact["email"], "to_name": contact["name"], "contact_id": contact_id,
                  "subject": subject, "body": body, "status": "draft", "created_at": self.now()}
         self.drafts[draft["id"]] = draft
-        self.write_log(actor, "draft email", f"{draft['id']} to {contact['name']}: {subject} (draft, not sent)")
+        self.write_log(actor, "draft email", f"to {contact['name']}: {subject} (draft, not sent)", ref=draft["id"])
         return {**draft, "next_step": "Saved as a draft in the broker's mailbox. It is not sent; the broker reviews and "
                                       "sends it themselves."}
 
@@ -308,12 +311,12 @@ class CRM:
                            e.outcome)
             raise
         now = self.clock()
-        write = {"id": self._next("W"), "status": "pending", "summary": summary, "input": inputs, "changes": normalized,
+        write: dict[str, Any] = {"id": self._next("W"), "status": "pending", "summary": summary, "input": inputs, "changes": normalized,
                  "hash": payload_hash(summary, normalized), "proposed_by": actor, "proposed_at": iso(now),
                  "expires_at": iso(now + WRITE_TTL), "result": None, "flags": _flags(normalized)}
         self.writes[write["id"]] = write
-        self.write_log(actor, "propose write", f"{write['id']} {summary} ({len(normalized)} change"
-                       f"{'' if len(normalized) == 1 else 's'}), waiting for a confirm")
+        self.write_log(actor, "propose write", f"{summary} ({len(normalized)} change{'' if len(normalized) == 1 else 's'}), "
+                       "waiting for a confirm", ref=write["id"])
         return self.preview(write)
 
     def preview(self, write: dict[str, Any]) -> dict[str, Any]:
@@ -342,22 +345,22 @@ class CRM:
             how = self.confirm.check(write, confirmation)
             self._still_valid(write)
         except CRMError as e:
-            self.write_log(actor, "save", f"{write_id}: {e.message}"[:300], e.outcome)
+            self.write_log(actor, "save", e.message, e.outcome, str(write_id)[:40])
             raise
         saved = [self._apply(c, write["id"]) for c in write["changes"]]
         write["status"], write["committed_at"] = "committed", self.now()
         write["result"] = {"saved": saved, "confirmed": how, "committed_by": actor}
         ids = ", ".join(s["id"] for s in saved)
-        self.write_log(actor, "save", f"{write['id']} saved: {ids} ({how})")
+        self.write_log(actor, "save", f"saved {_counted(saved)} ({how})", ref=f"{write['id']}: {ids}")
         return {"write_id": write["id"], "status": "saved", "saved": saved, "recorded_at": write["committed_at"]}
 
     def discard_write(self, actor: str, write_id: Any) -> dict[str, Any]:
         write = self.writes.get(write_id) if isinstance(write_id, str) else None
         if write is None or write["status"] != "pending":
-            self.write_log(actor, "discard", f"{write_id}: nothing pending to discard", "refused")
+            self.write_log(actor, "discard", "nothing waiting to discard", "refused", str(write_id)[:40])
             raise CRMError("not_pending", f"{write_id} is not waiting for a confirm.")
         write["status"] = "discarded"
-        self.write_log(actor, "discard", f"{write_id} discarded, nothing saved")
+        self.write_log(actor, "discard", f"{write['summary']}: discarded, nothing saved", ref=write_id)
         return {"write_id": write_id, "status": "discarded"}
 
     def is_expired(self, write: dict[str, Any]) -> bool:
@@ -564,6 +567,13 @@ class CRM:
                     item["time"] = _time_view("When it happened", c, "stated_time")
             out.append(item)
         return out
+
+
+def _counted(saved: list[dict[str, Any]]) -> str:
+    counts: dict[str, int] = {}
+    for s in saved:
+        counts[s["kind"]] = counts.get(s["kind"], 0) + 1
+    return " and ".join(f"{n} {kind}{'' if n == 1 else 's'}" for kind, n in counts.items())
 
 
 def _text_block(value: Any) -> str:

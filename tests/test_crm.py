@@ -303,7 +303,8 @@ def test_every_read_and_write_is_logged_with_the_system_time(crm, clock):
     actions = [(e["action"], e["outcome"]) for e in crm.log]
     assert actions == [("search", "ok"), ("open record", "ok"), ("read pipeline", "ok"), ("read calendar", "ok"),
                        ("propose write", "ok"), ("save", "refused"), ("save", "ok"), ("draft email", "ok")]
-    assert all(set(e) == {"at", "actor", "action", "detail", "outcome"} for e in crm.log)
+    assert all(set(e) == {"at", "actor", "action", "detail", "outcome", "ref"} for e in crm.log)
+    assert crm.log[-2]["ref"] == "W-1: N-6, T-3" and crm.log[-2]["detail"].startswith("saved 1 note and 1 task")
     assert all(e["at"] == clock.now.isoformat().replace("+00:00", "Z") for e in crm.log)
     assert "confirmed with the Confirm button" in crm.log[-2]["detail"]
 

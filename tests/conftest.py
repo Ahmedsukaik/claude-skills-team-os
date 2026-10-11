@@ -131,8 +131,8 @@ class ScriptedModel:
                                                      "cache_read_input_tokens": 4000}, 900)
 
 
-def tool(n: int, name: str, **data: Any) -> dict[str, Any]:
-    return {"type": "tool_use", "id": f"toolu_test_{n:03d}", "name": name, "input": data}
+def tool(n: int, tool_name: str, /, **data: Any) -> dict[str, Any]:
+    return {"type": "tool_use", "id": f"toolu_test_{n:03d}", "name": tool_name, "input": data}
 
 
 def text(t: str) -> dict[str, Any]:

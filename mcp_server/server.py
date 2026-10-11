@@ -82,8 +82,8 @@ def build_server(crm: CRM, actor: str | None = None) -> MCPServer:
                     raise ToolError(e.message) from e
 
             server.add_tool(guarded, name=fn.__name__, title=title, description=fn.__doc__,
-                            annotations=ToolAnnotations(title=title, readOnlyHint=read_only, destructiveHint=False,
-                                                        idempotentHint=read_only, openWorldHint=False))
+                            annotations=ToolAnnotations(title=title, read_only_hint=read_only, destructive_hint=False,
+                                                        idempotent_hint=read_only, open_world_hint=False))
             return guarded
         return decorator
 

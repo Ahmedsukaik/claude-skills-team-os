@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Claude Skills Team OS: live demo</title>
+<meta name="description" content="Claude skills that run a brokerage team's CRM work, with a read back and a confirm before every write. A short demo on a fictional brokerage.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232b59c3'/%3E%3Cpath d='M9 24V11l7-4 7 4v13' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linejoin='round'/%3E%3Cpath d='M13 24v-5h6v5' fill='none' stroke='%23fff' stroke-width='2.4'/%3E%3C/svg%3E">
+</head>
+<body class="app-body in-story" data-step="0" data-pane="broker" data-focus="broker">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="building" viewBox="0 0 24 24"><path d="M5 21V8l7-4 7 4v13"/><path d="M9.5 21v-5h5v5"/><path d="M9 10.5h.01M12 10.5h.01M15 10.5h.01"/></symbol>
+  <symbol id="spark" viewBox="0 0 24 24"><path d="M12 3.5c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5 3.9-.6 5.9-2.6 6.5-6.5Z"/><path d="M18.5 15.5c.25 1.6 1 2.35 2.5 2.5-1.5.15-2.25.9-2.5 2.5-.25-1.6-1-2.35-2.5-2.5 1.5-.15 2.25-.9 2.5-2.5Z"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></symbol>
+  <symbol id="refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></symbol>
+  <symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c.9-3.8 3.9-6 7.5-6s6.6 2.2 7.5 6"/></symbol>
+  <symbol id="database" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.5"/><path d="M4.5 5.5v13c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-13"/><path d="M4.5 12c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5"/></symbol>
+  <symbol id="shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.6c0 4.5 3.1 8.1 7.5 9.4 4.4-1.3 7.5-4.9 7.5-9.4V6Z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="book" viewBox="0 0 24 24"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5Z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3"/><path d="M9 7.5h6"/></symbol>
+  <symbol id="arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5.5 11.5 6.5-6.5 6.5 6.5"/></symbol>
+  <symbol id="doc" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></symbol>
+  <symbol id="task" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
+  <symbol id="mail" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/></symbol>
+  <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="quote" viewBox="0 0 24 24"><path d="M7 16c-1.7 0-3-1.3-3-3s1.3-3 3-3c2.2 0 3 2 3 4 0 3-2 5-5 5"/><path d="M17 16c-1.7 0-3-1.3-3-3s1.3-3 3-3c2.2 0 3 2 3 4 0 3-2 5-5 5"/></symbol>
+  <symbol id="chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="alert" viewBox="0 0 24 24"><path d="M10.3 4 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4a2 2 0 0 0-3.4 0Z"/><path d="M12 9.5v4M12 17h.01"/></symbol>
+  <symbol id="code" viewBox="0 0 24 24"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></symbol>
+  <symbol id="cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9.5 9.5h5v5h-5zM9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/></symbol>
+  <symbol id="list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+  <symbol id="flask" viewBox="0 0 24 24"><path d="M9 3h6"/><path d="M10 3v6.2L4.9 18a2 2 0 0 0 1.7 3h10.8a2 2 0 0 0 1.7-3L14 9.2V3"/><path d="M7.3 15h9.4"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg class="i"><use href="#building"/></svg></span>
+      <div class="brand-text">
+        <h1 class="brand-name">Claude Skills Team OS</h1>
+        <div class="brand-sub">Demo on a fictional brokerage</div>
+      </div>
+    </div>
+    <div></div>
+    <div class="top-actions">
+      <button type="button" class="btn btn-ghost btn-sm" id="replay" aria-label="Replay the demo" hidden><svg class="i i-sm" aria-hidden="true"><use href="#refresh"/></svg><span>Replay the demo</span></button>
+      <a class="btn btn-ghost btn-sm" href="https://github.com/Ahmedsukaik/claude-skills-team-os" target="_blank" rel="noopener" aria-label="Source code"><svg class="i i-sm" aria-hidden="true"><use href="#code"/></svg><span>Source code</span></a>
+    </div>
+  </header>
+
+  <section class="story" id="story" aria-labelledby="story-title" tabindex="-1">
+    <div class="story-main" id="story-main"></div>
+    <div class="story-actions" id="story-actions"></div>
+  </section>
+
+  <div class="switch-row phone-only" id="switch-row">
+    <div class="seg" role="group" aria-label="View">
+      <button type="button" data-pane="broker" aria-pressed="true">Broker</button>
+      <button type="button" data-pane="crm" aria-pressed="false">CRM <span class="count" id="switch-count" hidden></span></button>
+    </div>
+  </div>
+
+  <main class="layout">
+    <section class="broker-pane" aria-label="What the broker sees">
+      <div class="pane-eyebrow"><svg class="i" aria-hidden="true"><use href="#user"/></svg>What the broker sees</div>
+      <div class="messenger" role="region" aria-label="Chat with Claude">
+        <div class="m-head">
+          <span class="avatar" aria-hidden="true"><svg><use href="#spark"/></svg></span>
+          <div>
+            <h2 class="m-title">Claude</h2>
+            <div class="m-status" id="chat-status">Marrowby team workspace (fictional)</div>
+          </div>
+        </div>
+        <div class="thread" id="thread"></div>
+        <div class="thread-fade" aria-hidden="true"></div>
+        <div class="suggest" id="suggest" role="group" aria-label="Suggested messages"></div>
+        <form class="composer" id="composer">
+          <div class="composer-box">
+            <label for="input" class="sr-only">Message</label>
+            <textarea id="input" rows="1" maxlength="1500" dir="auto" placeholder="Paste a voice note or ask about a client" autocomplete="off"></textarea>
+            <button type="submit" class="send" id="send" aria-label="Send"><svg class="i" aria-hidden="true"><use href="#arrow-up"/></svg></button>
+          </div>
+        </form>
+      </div>
+      <p class="fiction-note">Marrowby Commercial is fictional. Every name, deal and email is made up.</p>
+    </section>
+
+    <section class="crm-pane" aria-label="The CRM">
+      <div class="crm-head">
+        <div class="pane-eyebrow"><svg class="i" aria-hidden="true"><use href="#database"/></svg>The CRM (system of record)</div>
+        <h2 class="crm-title">CRM</h2>
+        <p class="crm-desc">Nothing is written until the broker confirms. Every read and write is logged with the CRM's own clock.</p>
+        <p class="cost-line" id="cost-line" hidden></p>
+      </div>
+      <div class="panel" id="panel" tabindex="-1"></div>
+    </section>
+  </main>
+</div>
+
+<div class="toast toast-fixed" id="toast" role="status" hidden></div>
+<div class="side-label" id="side-label" hidden></div>
+<div class="sr-only" id="announce" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -19,12 +19,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-from playwright.sync_api import Page, sync_playwright
+from playwright.sync_api import Page, ViewportSize, sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = Path(__file__).resolve().parent / "img"
-SIZE = {"width": 1440, "height": 900}
-PHONE = {"width": 390, "height": 844}
+SIZE: ViewportSize = {"width": 1440, "height": 900}
+PHONE: ViewportSize = {"width": 390, "height": 844}
 
 
 def local_demo() -> tuple[str, Any]:

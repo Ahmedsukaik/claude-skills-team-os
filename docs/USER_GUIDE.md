@@ -22,15 +22,18 @@ deal in the CRM, and prepares one note and a task for each next step.
 Before anything is saved, Claude shows a card with exactly what will be recorded:
 
 - **the note**: who, which company, which property and deal, what was discussed, next steps;
-- **the tasks**, each with its due date, or "No date given";
-- **the times**: when it happened, in your words, next to "Recorded at: when you confirm".
+- **the tasks**, each with who it is for, which deal, and its due date (or "No date given");
+- **the times**: when it happened, in your words, next to "Recorded at: when you confirm";
+- **To check**: anything Claude wants you to look at, such as a vague time kept as words, or a
+  date said with "by" (a deadline, not an agreed day).
 
 Read it like you would read an email before sending. If it is right, press **Confirm and save**.
 If not, tell Claude what to change ("the follow up is with Ines, not Marcus"); it prepares a new
 card. **Discard** drops it, and nothing is saved.
 
 A yes typed in the chat is not enough in this demo: the Confirm button is the yes. A card is good
-for 30 minutes; after that, ask again for a fresh one.
+for 30 minutes; after that, ask again for a fresh one. A chat lasts until the end of the day: the
+next day the page starts a new one.
 
 ## Times: say what you know, nothing is guessed
 
@@ -41,7 +44,9 @@ The CRM keeps two times for every record:
 
 "Friday, October 23, 2026" or "October 23, 2026 at 3 pm" become a date. "Yesterday afternoon",
 "last week", "next Tuesday" or "October 23" (no year) stay as your words and are flagged, so
-nobody later mistakes a guess for a fact. If you want a date in the CRM, say the full date.
+nobody later mistakes a guess for a fact. So does a date inside a longer phrase, like "two weeks
+after October 23, 2026" or "not before October 30, 2026": the date alone would say something you
+did not. If you want a date in the CRM, say the full date.
 
 ## "Just log it, don't ask me"
 

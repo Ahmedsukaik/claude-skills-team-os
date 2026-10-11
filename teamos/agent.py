@@ -35,9 +35,9 @@ from .session import (
 from .skills import SkillLibrary
 from .tools import TOOLS
 
-# How long the live model rests after a failure, for every visitor of this server instance.
-# A request the API refused as invalid ("invalid") is a problem of that one chat: no rest.
-COOLDOWN = {"budget": 15 * 60, "auth": 15 * 60, "rate_limited": 30, "error": 30}
+# How long the live model rests after a failure, for every visitor of this server instance. A
+# request the API refused as invalid rests too: repeating it would fail the same way, and fast.
+COOLDOWN = {"budget": 15 * 60, "auth": 15 * 60, "rate_limited": 30, "error": 30, "invalid": 60}
 MAX_PROMPT_CHARS = 160_000  # about 40K tokens: far below Haiku 5.5's higher price above 100K
 FIXED = "Fixed rules (no AI) answered instead; the CRM's rules work the same way."
 NOTES = {
@@ -56,6 +56,7 @@ CONFIRM_ERRORS = {
     "already_used": "This one is already saved.",
     "discarded": "This one was discarded, so it can't be saved. Ask again if you still want it.",
     "stale": "The CRM changed since this read back, so it was not saved. Ask again for a fresh one.",
+    "changed": "That is not the read back on your screen, so nothing was changed. Reload and try again.",
     "not_pending": "This one is not waiting for a confirm.",
     "unknown_write": "There is nothing to confirm with that id.",
     "nothing_pending": "Nothing is waiting for a confirm to test with.",
@@ -114,20 +115,21 @@ class Agent:
             event = {"type": kind, "at": at}
             if kind == "test":
                 event["test"] = "commit_without_confirm"
-            else:
+            else:  # the read back the broker saw: its write id and its payload hash
                 event["write_id"] = str(action.get("write_id") or "")[:12]
+                event["hash"] = str(action.get("hash") or "")[:16]
             try:
                 apply(replay, event, strict=True)
             except CRMError as e:
                 raise ActionError(CONFIRM_ERRORS.get(e.code, e.message)) from e
             except SessionError as e:
-                raise ActionError("There is nothing to confirm with that id.") from e
+                raise ActionError("That read back can't be confirmed from this page. Reload and try again.") from e
             events.append(event)
         else:
             raise ActionError("Unknown action.")
         if call_model:
             events.append(self._step(replay, want_live, visitor_allowed, limit_note, at))
-        out = signed({"v": 1, "started": session["started"], "broker": session["broker"], "events": events})
+        out = signed({**session, "events": events})
         return {"session": out, "view": view(replay), "more": replay.awaiting}
 
     def _step(self, replay: Replay, want_live: bool, visitor_allowed: bool, limit_note: str, at: str) -> dict[str, Any]:

@@ -18,6 +18,7 @@ from typing import Any
 
 from crm import CRM, CRMError
 from crm.store import OPS
+from crm.timestamps import read_stated_time, relative_near
 
 from .skills import SkillError, SkillLibrary, default_library
 
@@ -101,6 +102,7 @@ class ToolResult:
     skill: str | None = None          # a skill loaded by this call
     write_id: str | None = None       # a write proposed by this call
     outcome: str = "ok"
+    plain: str = ""                   # a refusal in words for people (the content is for the model)
 
 
 @dataclass
@@ -113,22 +115,40 @@ class ToolContext:
 
 
 def _norm(text: str) -> str:
+    """Lower case, curly quotes made straight, punctuation dropped except a sentence end, which
+    stays as its own " . " so the words of one sentence are not read as part of the next."""
     text = text.lower().replace("\u2019", "'").replace("\u2018", "'").replace("\u201c", '"').replace("\u201d", '"')
-    return " ".join(re.sub(r"[^\w:/'\-]+", " ", text).split())
+    text = re.sub(r"[.!?;]+(?=\s|$)", " . ", text)
+    return " ".join(re.sub(r"[^\w:/'\-.]+", " ", text).split()).strip(" .")
 
 
-def said_by_broker(words: str, broker_words: list[str]) -> bool:
+def time_check(words: str, broker_words: list[str]) -> str | None:
+    """None when `words` are the broker's own words for a time; otherwise why not. A date cut out
+    of a relative phrase ("two weeks after Friday, October 23, 2026") is not their words either."""
     phrase = _norm(words)
-    return bool(phrase) and any(f" {phrase} " in f" {_norm(t)} " for t in broker_words)
+    if not phrase:
+        return "empty"
+    exact = read_stated_time(words).value is not None  # only a date can be cut out of a relative phrase
+    inside: str | None = None
+    for said in broker_words:
+        text = f" {_norm(said)} "
+        start = text.find(f" {phrase} ")
+        while start != -1:
+            near = relative_near(text, start + 1, start + 1 + len(phrase)) if exact else None
+            if near is None:
+                return None
+            inside = inside or near
+            start = text.find(f" {phrase} ", start + 1)
+    return f"part of a relative phrase ('{inside} ...')" if inside else "not said"
 
 
 def _ok(data: Any, label: str, **extra: Any) -> ToolResult:
     return ToolResult(json.dumps(data, ensure_ascii=False), False, label, **extra)
 
 
-def _err(error: str, message: str, label: str, outcome: str = "refused", **data: Any) -> ToolResult:
+def _err(error: str, message: str, label: str, outcome: str = "refused", plain: str | None = None, **data: Any) -> ToolResult:
     return ToolResult(json.dumps({"error": error, "message": message, **data}, ensure_ascii=False), True, label,
-                      outcome=outcome)
+                      outcome=outcome, plain=plain or message)
 
 
 def run_tool(ctx: ToolContext, name: str, data: Any) -> ToolResult:
@@ -140,7 +160,7 @@ def run_tool(ctx: ToolContext, name: str, data: Any) -> ToolResult:
         label = {"duplicate_contact": "Blocked: that contact is already in the CRM",
                  "duplicate_company": "Blocked: that company is already in the CRM",
                  "needs_confirm": "Save refused: it needs the broker's Confirm"}.get(e.code, "Refused by the CRM")
-        return _err(e.code, e.message, label, e.outcome, **e.extra)
+        return _err(e.code, e.message, label, e.outcome, e.plain, **e.extra)
     except SkillError as e:
         return _err("skill", str(e), "A skill file was not found")
     except (TypeError, ValueError, KeyError) as e:
@@ -186,19 +206,26 @@ def _run(ctx: ToolContext, name: str, data: dict[str, Any]) -> ToolResult:
         return _ok({"events": events}, "Checked the calendar")
     if name == "propose_write":
         if HOUSE_RULES not in ctx.loaded:
-            crm.write_log(ctx.actor, "propose write", "refused: the house-rules skill was not loaded", "refused")
+            plain = "Refused: the house rules were not loaded first. Nothing was proposed."
+            crm.write_log(ctx.actor, "propose write", plain, "refused")
             return _err("house_rules_not_loaded", "Load the house-rules skill first (load_skill), then propose again. "
-                                                  "Every write follows the house rules.", "Write refused: house rules not loaded")
+                                                  "Every write follows the house rules.", "Write refused: house rules not loaded",
+                        plain=plain)
         changes = data.get("changes")
         for change in changes if isinstance(changes, list) else []:
             for key in ("stated_time_text", "due_text"):
                 words = change.get(key) if isinstance(change, dict) else None
-                if isinstance(words, str) and words.strip() and not said_by_broker(words, ctx.broker_words):
-                    crm.write_log(ctx.actor, "propose write", f"refused: '{words[:60]}' is not in the broker's words",
-                                  "refused")
-                    return _err("time_not_stated", f"'{words}' is not something the broker said. Copy a time exactly as "
-                                                   "the broker said it, or leave it out. Never work a date out yourself.",
-                                "Write refused: a time not in the broker's words")
+                if not isinstance(words, str) or not words.strip():
+                    continue
+                why = time_check(words, ctx.broker_words)
+                if why:
+                    plain = f"Refused: '{words[:60]}' is not a time the broker gave in those words. Nothing was proposed."
+                    crm.write_log(ctx.actor, "propose write", plain, "refused")
+                    detail = ("is not something the broker said" if why == "not said" else
+                              f"is {why} in the broker's words, so on its own it is not what they said")
+                    return _err("time_not_stated", f"'{words}' {detail}. Copy the whole time phrase exactly as the broker "
+                                                   "said it, or leave it out. Never work a date out yourself.",
+                                "Write refused: a time not in the broker's words", plain=plain)
         preview = crm.propose_write(ctx.actor, _str(data, "summary"), changes)
         return _ok(preview, "Prepared a change for the broker's confirm", write_id=preview["write_id"])
     if name == "commit_write":

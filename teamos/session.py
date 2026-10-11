@@ -3,8 +3,8 @@
     broker     {"type": "broker", "text": "...", "at": "2026-10-11T14:02:11Z"}
     assistant  {"type": "assistant", "content": [text / tool_use blocks], "stop_reason", "model", "mode",
                 "usage", "ms", "at"}
-    confirm    {"type": "confirm", "write_id": "W-1", "at": ...}    the broker pressed Confirm
-    discard    {"type": "discard", "write_id": "W-1", "at": ...}    the broker pressed Discard
+    confirm    {"type": "confirm", "write_id": "W-1", "hash": "...", "at": ...}   the broker pressed Confirm
+    discard    {"type": "discard", "write_id": "W-1", "hash": "...", "at": ...}   the broker pressed Discard
     test       {"type": "test", "test": "commit_without_confirm", "at": ...}
 
 The server signs the event list (an HMAC with a secret only the server knows) and refuses a chat
@@ -12,9 +12,15 @@ whose signature does not match, so the browser cannot add or edit events. Even s
 are never stored: on replay every tool call runs again, through the same rules, against a fresh
 copy of the CRM.
 
+A confirm or a discard carries the payload hash of the card the broker saw, so it applies to that
+exact read back and nothing else. The envelope carries the version of the replay rules: a chat
+signed under other rules is not replayed (the page starts a new one).
+
 Every event carries the server's time when it happened ("at"). On replay the CRM's clock is set
 to that time, so `recorded_at` is the system time of the moment the broker confirmed, not of the
-replay. Nothing is kept on the server between requests.
+replay. A chat lives for the day it started: "today" for the CRM (stale deals, the calendar,
+flags on dates) is that day, so a chat from an earlier day is not continued. Nothing is kept on
+the server between requests.
 """
 from __future__ import annotations
 
@@ -31,6 +37,7 @@ from typing import Any
 
 from crm import CRM, ButtonConfirm, CRMError, iso
 from crm import data as crm_data
+from crm.text import strip_control
 from crm.timestamps import nice
 
 from .models import cost_usd
@@ -42,6 +49,8 @@ log = logging.getLogger("teamos.session")
 MAX_EVENTS = 220
 MAX_BROKER_MESSAGES = 25
 MAX_TEXT = 1500            # a voice note can be long
+MAX_RAW_TEXT = 4000        # refused before any cleaning, so cleaning time stays bounded
+RULES_VERSION = 2          # bump when replaying old events under new rules would change what they did
 MAX_STEPS = 10             # model calls per broker message
 MAX_TOOL_CALLS = 8         # tool calls in one model step
 MAX_BLOCKS = 40
@@ -49,10 +58,11 @@ MAX_REPLY_TEXT = 8000
 MAX_TOOL_INPUT = 8000
 TOOL_ID = re.compile(r"toolu_[A-Za-z0-9_]{1,60}")
 SYSTEM_TAG = re.compile(r"</?\s*(?:" + SESSION_TAG + "|" + UPDATE_TAG + r")\b[^>]*>?", re.I)
-CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f​-‏⁠-⁤﻿\ud800-\udfff]")
 SIG = re.compile(r"[0-9a-f]{64}")
 AT = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 WRITE_ID = re.compile(r"W-\d{1,4}")
+HASH = re.compile(r"[0-9a-f]{16}")
+TAG_LIKE = str.maketrans({"<": chr(0x2039), ">": chr(0x203A)})  # single angle quotes: nothing tag-like reaches the model
 CUT_OFF = ("refusal", "max_tokens", "model_context_window_exceeded")
 TOO_MANY_STEPS = "I took too many steps on this one and stopped. Nothing was saved. Try asking again in one short message."
 CUT_OFF_REPLY = "I couldn't finish that reply. Nothing was saved. Try asking again in other words."
@@ -79,14 +89,17 @@ _SECRET = _secret()
 CONFIRM_SECRET = hmac.new(_SECRET, b"confirm-button", hashlib.sha256).digest()  # separate from the signing key
 
 
+ENVELOPE = ("v", "rules", "started", "broker", "events")
+
+
 def signature(session: dict[str, Any]) -> str:
-    body = json.dumps({k: session.get(k) for k in ("v", "started", "broker", "events")},
+    body = json.dumps({k: session.get(k) for k in ENVELOPE},
                       sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
     return hmac.new(_SECRET, body.encode(), hashlib.sha256).hexdigest()
 
 
 def signed(session: dict[str, Any]) -> dict[str, Any]:
-    out = {"v": session["v"], "started": session["started"], "broker": session["broker"], "events": session["events"]}
+    out = {k: session[k] for k in ENVELOPE}
     out["sig"] = signature(out)
     return out
 
@@ -98,7 +111,8 @@ def now_utc() -> datetime:
 def new_session(broker_id: str = "B-1", today: date | None = None) -> dict[str, Any]:
     if broker_id not in {b["id"] for b in crm_data.BROKERS}:
         broker_id = "B-1"
-    return signed({"v": 1, "started": (today or date.today()).isoformat(), "broker": broker_id, "events": []})
+    return signed({"v": 1, "rules": RULES_VERSION, "started": (today or date.today()).isoformat(), "broker": broker_id,
+                   "events": []})
 
 
 # ---------------------------------------------------------------------------- replay
@@ -166,13 +180,14 @@ def start(session: Any, skills: SkillLibrary | None = None, today: date | None =
             valid = False
         if not valid:
             raise SessionError("the chat was changed outside this server")
+    if session.get("rules") != RULES_VERSION:
+        raise SessionError("this chat was made under older rules")
     try:
         started = date.fromisoformat(str(session.get("started")))
     except ValueError as e:
         raise SessionError("bad start date") from e
-    today = today or date.today()
-    if not today - timedelta(days=30) <= started <= today + timedelta(days=1):
-        raise SessionError("this chat is too old")
+    if started != (today or date.today()):
+        raise SessionError("this chat is from another day")
     if session.get("broker") not in {b["id"] for b in crm_data.BROKERS}:
         raise SessionError("unknown broker")
     if len(session["events"]) > MAX_EVENTS:
@@ -191,7 +206,7 @@ def _event_time(r: Replay, event: dict[str, Any]) -> datetime:
     started = r.crm.today
     if moment < r.now - timedelta(seconds=1) and r.transcript:
         raise SessionError("events out of order")
-    if not started - timedelta(days=1) <= moment.date() <= started + timedelta(days=32):
+    if not started - timedelta(days=1) <= moment.date() <= started + timedelta(days=1):  # UTC against the local day
         raise SessionError("event time outside the chat")
     return moment
 
@@ -215,9 +230,10 @@ def apply(r: Replay, event: Any, strict: bool = False) -> None:
 
 
 def strip_tags(text: str) -> str:
-    """Remove control and invisible characters, then the tags only the system may use, until
-    none is left: "<crm_<crm_update>update>" must not turn into a tag after one pass."""
-    text = CONTROL.sub("", text)
+    """Remove control, invisible and bidi characters, then the tags only the system may use, until
+    none is left: "<crm_<crm_update>update>" must not turn into a tag after one pass. Callers
+    limit the length first: each pass is linear, and nesting can need one pass per layer."""
+    text = strip_control(text)
     previous = None
     while previous != text:
         previous, text = text, SYSTEM_TAG.sub("", text)
@@ -225,9 +241,9 @@ def strip_tags(text: str) -> str:
 
 
 def clean_broker_text(text: Any) -> str:
-    if not isinstance(text, str):
-        raise SessionError("bad message")
-    text = strip_tags(text).replace("<", "‹").replace(">", "›")  # nothing tag-like reaches the model
+    if not isinstance(text, str) or len(text) > MAX_RAW_TEXT:  # before any cleaning
+        raise SessionError("bad or too long message")
+    text = strip_tags(text).translate(TAG_LIKE)
     if not text or len(text) > MAX_TEXT:
         raise SessionError("message is empty or too long")
     return text
@@ -355,21 +371,27 @@ def _reply(r: Replay, text: str, mode: str, model: str, problem: str | None = No
 
 
 def _decide(r: Replay, kind: str, event: dict[str, Any], strict: bool) -> None:
-    write_id = event.get("write_id")
+    write_id, seen = event.get("write_id"), event.get("hash")
     if not isinstance(write_id, str) or not WRITE_ID.fullmatch(write_id):
         raise SessionError("bad write id")
+    if not isinstance(seen, str) or not HASH.fullmatch(seen):
+        raise SessionError("a confirm or discard must name the read back it was given for")
     who = r.broker["name"]
     try:
         if kind == "confirm":
-            write = r.crm.writes.get(write_id)
-            token = r.confirm.mint(write_id, write["hash"]) if write else None  # minted here, only for the button
-            result = r.crm.commit_write(who, write_id, write["hash"] if write else None, token)
+            # Minted here, only for the button, and only for the payload the broker saw on the card. The CRM
+            # refuses it when that is not the payload it holds.
+            result = r.crm.commit_write(who, write_id, seen, r.confirm.mint(write_id, seen))
             counts = _count_saved(result["saved"])
             r.transcript.append({"kind": "notice", "notice": "saved", "write_id": write_id, "at": iso(r.now),
                                  "text": f"Saved to the CRM by {who}: {counts}."})
             ids = ", ".join(f"{s['id']} ({s['kind']})" for s in result["saved"])
             update = f"The broker pressed Confirm. {write_id} was saved: {ids}, recorded at {result['recorded_at']}."
         else:
+            write = r.crm.writes.get(write_id)
+            if write is not None and write["hash"] != seen:
+                raise CRMError("changed", "That is not the read back the broker saw.",
+                               plain="That is not the read back you saw, so nothing was discarded.")
             r.crm.discard_write(who, write_id)
             r.transcript.append({"kind": "notice", "notice": "discarded", "write_id": write_id, "at": iso(r.now),
                                  "text": "Discarded. Nothing was saved."})
@@ -404,11 +426,10 @@ def _test(r: Replay, event: dict[str, Any], strict: bool) -> None:
         return
     tester = ToolContext(r.crm, r.ctx.skills, actor=TEST_ACTOR, loaded=set(r.ctx.loaded))
     result = run_tool(tester, "commit_write", {"write_id": write["id"], "payload_hash": write["hash"]})
-    message = json.loads(result.content).get("message", "").split(" Tell the broker")[0]  # the rest is for the model
     r.stats["refused_saves"] += int(result.is_error)
     r.transcript.append({"kind": "test", "write_id": write["id"], "refused": result.is_error, "at": iso(r.now),
                          "text": "Test: the assistant tried to save the note without your Confirm.",
-                         "result": message if result.is_error else "It was saved."})
+                         "result": result.plain if result.is_error else "It was saved."})
 
 
 # ---------------------------------------------------------------------------- what the page shows

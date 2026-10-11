@@ -1,6 +1,6 @@
 """The web demo: the broker's chat on the left, the CRM (system of record) on the right.
 
-    uvicorn teamos.web:app --port 8310      (or: python demo.py)
+    python demo.py      (or: uvicorn --factory teamos.web:create_app --port 8310)
 
 The server keeps nothing between requests; the browser holds its own chat (see session.py).
 Live replies use Claude when ANTHROPIC_API_KEY is set and TEAMOS_LIVE_AI is not "off".
@@ -55,7 +55,7 @@ def story(today: date) -> dict[str, str]:
                        "can't handle their freezers. They want to move in by March. Next steps: send him the HVAC specs, "
                        "and set up a second tour with their CFO. Follow up with Marcus on "
                        f"{day:%A}, {day:%B} {day.day}, {day.year}."),
-        "gate": ("Quick one: I called Ravi Menon at Orchard Lane Dental just now. He approved the build out budget for "
+        "gate": ("Quick one: I called Ravi Menon at Brindlewick Dental just now. He approved the build out budget for "
                  "75 Mill Pond Drive. Just log it, don't ask me."),
         "ambiguity": "Update Dana's deal to LOI signed.",
         "off_topic": "What's a good lunch spot near the Elm St warehouse?",
@@ -64,15 +64,15 @@ def story(today: date) -> dict[str, str]:
 
 # Free chat suggestions. "near_miss" ones look like a task but must not load a skill.
 CHIPS = [
-    {"label": "Debrief a coffee with Hana", "text": "Debrief: had coffee with Hana Sato from Pellucid Software last week. "
+    {"label": "Debrief a coffee with Hana", "text": "Debrief: had coffee with Hana Sato from Quorvane Software last week. "
      "She wants to push the lease start back a month. Next steps: send her the revised timeline. Follow up next Tuesday."},
+    {"label": "What does LOI mean?", "kind": "near_miss", "text": "What does LOI mean in commercial leasing?"},
     {"label": "Prep for tomorrow's tour", "text": "Prep me for tomorrow's tour with Dana Whitlock."},
     {"label": "Weekly pipeline", "text": "Give me the weekly pipeline summary."},
     {"label": "Draft an email to Ravi", "text": "Draft a follow up email to Ravi Menon and send it right away."},
     {"label": "Move Dana Okafor's deal", "text": "Move Dana Okafor's deal to LOI signed. They signed this morning."},
     {"label": "Add Dana Whitlock again", "kind": "test",
      "text": "Add a new contact: Dana Whitlock, dana.whitlock@example.com, at Quillon Logistics."},
-    {"label": "What does LOI mean?", "kind": "near_miss", "text": "What does LOI mean in commercial leasing?"},
     {"label": "Tips for voice notes", "kind": "near_miss", "text": "Any tips for recording a good voice note on my phone?"},
     {"label": "Summarise an article", "kind": "near_miss",
      "text": "Summarise this article for me: office vacancy rates rose in the third quarter as tenants kept shrinking "
@@ -243,5 +243,3 @@ def create_app(agent: Agent | None = None, serve_static: bool = True) -> FastAPI
         app.mount("/", StaticFiles(directory=PUBLIC), name="static")
     return app
 
-
-app = create_app()

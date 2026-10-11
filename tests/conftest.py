@@ -79,8 +79,21 @@ class Chat:
             guard += 1
         return out
 
+    def card(self, write_id: str | None = None) -> dict[str, Any]:
+        """A read back card as the page shows it (the newest pending one by default)."""
+        if write_id is None:
+            return dict(self.view["pending"][-1])
+        cards = [c for t in self.view["transcript"] for c in t.get("cards", [])]
+        return next(c for c in cards if c["id"] == write_id)
+
     def confirm(self, write_id: str | None = None) -> dict[str, Any]:
-        return self.do({"type": "confirm", "write_id": write_id or self.view["pending"][-1]["id"]})
+        """Press Confirm on a card: the page sends the write id and the hash of the card it shows."""
+        card = self.card(write_id)
+        return self.do({"type": "confirm", "write_id": card["id"], "hash": card["hash"]})
+
+    def discard(self, write_id: str | None = None) -> dict[str, Any]:
+        card = self.card(write_id)
+        return self.do({"type": "discard", "write_id": card["id"], "hash": card["hash"]})
 
     @property
     def view(self) -> dict[str, Any]:

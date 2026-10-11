@@ -14,7 +14,7 @@ def test_the_story_end_to_end(chat):
     chat.say(STORY["voice_note"])
     reply = chat.reply()
     assert reply["mode"] == "guided" and reply["skills"] == ["house-rules", "voice-note-debrief"]
-    assert "Nothing is saved yet" in reply["text"] and '"yesterday afternoon" (kept as your words' in reply["text"]
+    assert reply["text"] == "Here's what I'll save. One time was vague, so I kept your words. Press Confirm, or tell me what to change."
     changes = chat.view["pending"][0]["changes"]
     note, *tasks = changes
     assert (note["contact_id"], note["deal_id"], note["property_id"]) == ("C-5", "D-3", "P-5")
@@ -37,7 +37,7 @@ def test_the_story_end_to_end(chat):
     assert chat.reply()["skills"] == ["crm-update"] and chat.view["metrics"]["writes_proposed"] == 2
 
     chat.say(STORY["off_topic"])
-    assert chat.reply()["skills"] == [] and chat.reply()["steps"] == [] and "No skill fits" in chat.reply()["text"]
+    assert chat.reply()["skills"] == [] and chat.reply()["steps"] == [] and "the CRM wasn't touched" in chat.reply()["text"]
     assert chat.view["skills_used"] == ["house-rules", "voice-note-debrief", "crm-update"]
 
 
@@ -46,7 +46,7 @@ def test_an_answer_to_which_dana_finishes_the_change(chat):
     chat.say("The Bramblecote one")
     change = chat.view["pending"][0]["changes"][0]
     assert change == {"op": "update_deal_stage", "deal_id": "D-2", "stage": "LOI signed", "before": {"stage": "Proposal sent"},
-                      "stated_time_text": None, "stated_time": None, "stated_time_note": None}
+                      "stated_time_text": None, "stated_time": None, "stated_time_note": None, "stated_time_warning": None}
 
 
 def test_a_new_question_after_which_dana_is_not_taken_as_the_answer(chat):
@@ -98,7 +98,7 @@ def test_my_pipeline_filters_by_the_signed_in_broker():
     ("Just left the coffee with Hana Sato. She wants more time.", "debrief"),
     ("Brief me before my call with Marcus Bell.", "prep"),
     ("Change Hana Sato's email to hana@example.com", "update"),
-    ("Move the Pellucid deal to Closed won.", "update"),
+    ("Move the Quorvane deal to Closed won.", "update"),
     ("Email Dana Okafor a recap.", "email"),
     ("Which deals are stale?", "pipeline"),
     ("How should we log times in the CRM?", "rules"),
@@ -119,3 +119,32 @@ def test_reading_a_note_keeps_words_and_never_dates():
     assert find_time("No time here.") is None
     assert sentences("Walked 14 Elm St. He liked it. Meet Oct. 23, 2026.") == ["Walked 14 Elm St.", "He liked it.",
                                                                               "Meet Oct. 23, 2026."]
+
+
+@pytest.mark.parametrize("text, words", [
+    ("What does LOI mean in commercial leasing?", "letter of intent"),
+    ("What is a sales pipeline?", "list of deals"),
+    ("Any tips for recording a good voice note on my phone?", "stays in your words"),
+    ("Summarise this article for me: office vacancy rates rose.", "Fixed rules can't summarise"),
+    ("What's a good lunch spot near the Elm St warehouse?", "restaurant listings"),
+    ("What's the weather like for tomorrow's tour?", "weather"),
+    ("What can you do?", "debrief a call"),
+])
+def test_near_misses_get_a_short_answer_and_no_skill(chat, text, words):
+    chat.say(text)
+    assert words in chat.reply()["text"] and chat.reply()["skills"] == [] and chat.reply()["steps"] == []
+
+
+def test_who_is_someone_is_a_read_only_lookup(chat):
+    chat.say("Who is Dana Whitlock?")
+    reply = chat.reply()
+    assert "Dana Whitlock is VP Real Estate at Quillon Logistics" in reply["text"] and reply["skills"] == ["house-rules"]
+    assert chat.view["metrics"]["writes_proposed"] == 0
+    chat.say("Who is Dana?")
+    assert "Which one did you mean?" in chat.reply()["text"]
+
+
+def test_a_relative_phrase_stays_whole_in_the_debrief(chat):
+    chat.say("Voice note: call with Ravi Menon this morning. Follow up two weeks after Friday, October 23, 2026.")
+    task = [c for c in chat.view["pending"][0]["changes"] if c["op"] == "create_task"][-1]
+    assert task["due_text"] == "two weeks after Friday, October 23, 2026" and task["due"] is None

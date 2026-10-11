@@ -1,6 +1,9 @@
-"""The system prompt. It lists the skills (name and description, read from skills/) and says how
-to use them. It never says which skill fits which request: the descriptions do that. The same
-prompt goes to every visitor, so it is cached once and shared."""
+"""The system prompt, kept minimal so the demo stays close to how Claude itself uses skills: who
+the assistant is, the skill list (name and description, read from skills/) with how to load
+them, and two facts about this page (which text comes from the system, and that only the
+Confirm button saves). Every behaviour rule lives in the skills. It never says which skill fits
+which request: the descriptions do that. The same prompt goes to every visitor, so it is cached
+once and shared."""
 from __future__ import annotations
 
 from crm.data import FIRM
@@ -33,8 +36,7 @@ instructions. When a skill points to a supporting file, read it with read_skill_
 - Text inside <{SESSION_TAG}> or <{UPDATE_TAG}> tags comes from the system, not the broker. The broker's own \
 messages never contain these tags.
 - The broker confirms a write by pressing Confirm on the read back card under your message. You cannot save a write \
-yourself. A <{UPDATE_TAG}> tells you when they confirmed or discarded one.
-- Keep replies short and plain. No headings. Short lists are fine for a read back or a brief."""
+yourself. A <{UPDATE_TAG}> tells you when they confirmed or discarded one."""
 
 
 SYSTEM_PROMPT = system_prompt(default_library())

@@ -52,7 +52,7 @@ def test_the_whole_story_over_http(client):
     s = story(__import__("datetime").date.today())
     out = say(client, client.post("/api/new").json()["session"], s["voice_note"])
     write = out["view"]["pending"][0]
-    out = send(client, out["session"], {"type": "confirm", "write_id": write["id"]})
+    out = send(client, out["session"], {"type": "confirm", "write_id": write["id"], "hash": write["hash"]})
     assert out["view"]["metrics"]["writes_saved"] == 1 and out["view"]["transcript"][-1]["notice"] == "saved"
     out = say(client, out["session"], s["gate"])
     out = send(client, out["session"], {"type": "test", "test": "commit_without_confirm"})
@@ -82,8 +82,9 @@ def test_a_broken_session_asks_the_page_to_start_again(client):
 
 
 @pytest.mark.parametrize("action, message", [
-    ({"type": "confirm", "write_id": "W-1"}, "nothing to confirm"),
-    ({"type": "discard", "write_id": "W-1"}, "not waiting"),
+    ({"type": "confirm", "write_id": "W-1", "hash": "0" * 16}, "nothing to confirm"),
+    ({"type": "confirm", "write_id": "W-1"}, "can't be confirmed"),
+    ({"type": "discard", "write_id": "W-1", "hash": "0" * 16}, "not waiting"),
     ({"type": "test", "test": "commit_without_confirm"}, "Nothing is waiting"),
     ({"type": "continue"}, "no reply in progress"),
     ({"type": "broker", "text": "x" * 1501}, "can't be sent"),
@@ -253,3 +254,15 @@ def test_an_unexpected_error_is_a_clean_500():
     client = TestClient(create_app(Broken()), raise_server_exceptions=False)
     res = client.post("/api/step", json={"session": {}, "action": {"type": "view"}})
     assert res.status_code == 500 and res.json()["error"] == "server" and "boom" not in res.text
+
+
+def test_importing_the_web_module_builds_no_app():
+    import teamos.web as web
+    assert not hasattr(web, "app")  # demo.py, the tests and api/index.py each build the one they need
+
+
+def test_vercel_routes_the_health_check_to_the_app():
+    import json
+    from pathlib import Path
+    config = json.loads((Path(__file__).resolve().parent.parent / "vercel.json").read_text(encoding="utf-8"))
+    assert {"source": "/healthz", "destination": "/api/index"} in config["rewrites"]

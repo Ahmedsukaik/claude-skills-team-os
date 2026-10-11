@@ -15,16 +15,40 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from crm import data as crm_data
-from crm.timestamps import nice
+from crm.timestamps import nice, relative_near
 
 from .models import Turn
 
 HOUSE = "house-rules"
 SKILLS_FOR = {"debrief": [HOUSE, "voice-note-debrief"], "update": [HOUSE, "crm-update"], "prep": [HOUSE, "meeting-prep"],
-              "email": [HOUSE, "follow-up-email"], "pipeline": [HOUSE, "weekly-pipeline"], "rules": [HOUSE]}
+              "email": [HOUSE, "follow-up-email"], "pipeline": [HOUSE, "weekly-pipeline"], "rules": [HOUSE],
+              "whois": [HOUSE]}
 CAN_DO = ("I can debrief a call or a tour from your voice note, update a contact, company or deal stage, prep you for "
           "a meeting, draft a follow up email, or summarise the pipeline.")
-CONFIRM_LINE = "Press Confirm on the card to save it, or tell me what to change."
+UNTOUCHED = "No skill needed, so the CRM wasn't touched."
+NUMBERS = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"]
+# Questions near a skill's job that need no skill: a short fixed answer instead of a dead end.
+CANNED = [
+    (re.compile(r"\bloi\b|letter of intent", re.I), re.compile(r"\b(?:mean|stand for|what(?:'s| is))\b", re.I),
+     "LOI is a letter of intent: a short, non-binding outline of the main lease terms (rent, term, start date) that "
+     "both sides sign before the lease itself is drafted. " + UNTOUCHED),
+    (re.compile(r"\bsales pipeline\b|\bpipeline\b", re.I), re.compile(r"^\s*what(?:'s| is)\s+an?\b", re.I),
+     "A sales pipeline is the list of deals a team is working on, grouped by how far along each one is. Ours runs "
+     "Lead, Touring, Proposal sent, LOI signed, Lease negotiation, then Closed won or lost. Ask for the weekly pipeline "
+     "to see it. " + UNTOUCHED),
+    (re.compile(r"\bvoice notes?\b", re.I), re.compile(r"\b(?:tips?|how (?:do|should|can) i|advice)\b", re.I),
+     "Say who you met, where and when; what they liked and what worried them; and each next step, with a date if you "
+     "have one. A full date (\"Friday, October 23, 2026\") is saved as a date; \"next week\" stays in your words. "
+     + UNTOUCHED),
+    (re.compile(r"\bsummari[sz]e\b", re.I), re.compile(r".", re.I),
+     "Fixed rules can't summarise an article; with the live AI on, Claude can. " + UNTOUCHED),
+    (re.compile(r"\b(?:lunch|coffee shop|restaurant|places? to eat)\b", re.I), re.compile(r"\b(?:good|best|where|spot)\b", re.I),
+     "I don't have restaurant listings, so I can't suggest a spot. " + UNTOUCHED),
+    (re.compile(r"\bweather\b", re.I), re.compile(r".", re.I),
+     "I can't see weather forecasts. For the tour itself, ask me to prep you for it. " + UNTOUCHED),
+    (re.compile(r"^\s*(?:what can you do|help|what do you do)\b", re.I), re.compile(r".", re.I), CAN_DO),
+]
+WHOIS = re.compile(r"^\s*(?:who(?:'s| is)|tell me about|what do we (?:know|have) (?:on|about))\b", re.I)
 
 _WD = r"(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)"
 _MON = (r"(?:january|february|march|april|may|june|july|august|september|october|november|december|"
@@ -87,7 +111,7 @@ EMAIL_ADDR = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 TOUR = re.compile(r"\b(?:tour|toured|walked|walk-?through|showing|site visit)\b", re.I)
 CALL = re.compile(r"\b(?:call|called|phone|rang)\b", re.I)
 COMPANY_KEYS = {cid: key for cid, key in (("CO-1", "quillon"), ("CO-2", "bramblecote"), ("CO-3", "tessarine"),
-                                          ("CO-4", "orchard lane"), ("CO-5", "kilnworth"), ("CO-6", "pellucid"))}
+                                          ("CO-4", "brindlewick"), ("CO-5", "kilnworth"), ("CO-6", "quorvane"))}
 COMPANY_NAMES = {cid: name for cid, name, _ in crm_data.COMPANIES}
 
 
@@ -128,6 +152,8 @@ def classify(text: str) -> str | None:
     place = property_mention(text)
     if DEFINITION.search(text) and not names:
         return None
+    if WHOIS.search(text) and names:
+        return "whois"
     if PREP.search(text) and (names or place or re.search(r"\b(?:meeting|call|tour)\b", text, re.I)):
         return "prep"
     if ADD_CONTACT.search(text) or ADD_COMPANY.search(text) or EDIT_CONTACT.search(text):
@@ -146,8 +172,16 @@ def classify(text: str) -> str | None:
 
 
 def find_time(text: str) -> str | None:
-    """The first stated time in the text, exactly as written."""
-    m = EXACT_TIME.search(text) or VAGUE_TIME.search(text)
+    """The first stated time in the text, exactly as written. A date inside a relative phrase
+    ("two weeks after Friday, October 23, 2026") comes with the phrase, so it stays words."""
+    m = EXACT_TIME.search(text)
+    if m:
+        near = relative_near(text, m.start(), m.end())
+        if near:
+            begin = text.lower().rfind(near.split()[0].lower(), 0, m.start())
+            return text[max(begin, 0):m.end()].strip(" ,.")
+        return m.group(0).strip(" ,.")
+    m = VAGUE_TIME.search(text)
     return m.group(0).strip(" ,.") if m else None
 
 
@@ -329,11 +363,12 @@ def plan(chat: Chat) -> list[dict[str, Any]]:
             return [_text(f"Hi{' ' + chat.broker_first if chat.broker_first else ''}. {CAN_DO}")]
         if THANKS.match(text):
             return [_text("You're welcome.")]
-        return [_text("No skill fits that one, so I've left the CRM alone. " + CAN_DO)]
+        canned = next((answer for topic, ask, answer in CANNED if topic.search(text) and ask.search(text)), None)
+        return [_text(canned or "No skill fits that one, so I've left the CRM alone. " + CAN_DO)]
     loads = [chat.call("load_skill", name=s) for s in SKILLS_FOR[intent]
              if s not in chat.loaded and not any(c["input"].get("name") == s for c, _, _ in chat.done("load_skill"))]
     handler = {"debrief": _debrief, "update": _update, "prep": _prep, "email": _email, "pipeline": _pipeline,
-               "rules": _rules}[intent]
+               "rules": _rules, "whois": _whois}[intent]
     out = handler(chat, request, answer)
     if loads:
         calls = [b for b in out if b["type"] == "tool_use"]
@@ -393,43 +428,53 @@ def _after_propose(chat: Chat, request: str, names: dict[str, str]) -> list[dict
     _, data, failed = done[-1]
     if failed:
         return [_text(f"The CRM did not accept that: {data.get('message', 'it was refused')}")]
-    lead = "Every write needs your confirm after the read back, so nothing is saved yet.\n\n" if META.search(request) else ""
-    return [_text(lead + readback_text(data, names))]
+    lead = "Every write needs your confirm after the read back, so nothing is saved yet. " if META.search(request) else ""
+    return [_text(lead + card_reply(data))]
 
 
-def readback_text(preview: dict[str, Any], names: dict[str, str]) -> str:
-    lines = ["Here is what I will save to the CRM. Nothing is saved yet.", ""]
-    for c in preview["changes"]:
-        op = c["op"]
-        if op == "create_note":
-            lines.append(f"Note: {c['summary']}")
-            lines.append(f"- Contact: {names.get(c['contact_id'], c['contact_id'])}")
-            for key, label in (("property_id", "Property"), ("deal_id", "Deal")):
-                if c.get(key):
-                    lines.append(f"- {label}: {names.get(c[key], c[key])}")
-            if c.get("stated_time_text"):
-                kept = f" ({nice(c['stated_time'])})" if c.get("stated_time") else " (kept as your words, no date set)"
-                lines.append(f"- When it happened: \"{c['stated_time_text']}\"{kept}")
-            if c.get("discussed"):
-                lines.append("- Discussed: " + "; ".join(c["discussed"]))
-        elif op == "create_task":
-            due = nice(c["due"]) if c.get("due") else f"\"{c['due_text']}\" (kept as your words, no date set)" \
-                if c.get("due_text") else "no date given"
-            lines.append(f"Task: {c['title']}, due {due}")
-        elif op == "update_deal_stage":
-            lines.append(f"Deal: {names.get(c['deal_id'], c['deal_id'])}")
-            lines.append(f"- Stage: {c['before']['stage']} -> {c['stage']}")
-        elif op == "create_contact":
-            lines.append(f"New contact: {c['first_name']} {c['last_name']}, {c['email']}, "
-                         f"{names.get(c['company_id'], c['company_id'])}")
-        elif op == "update_contact":
-            for key, before in c["before"].items():
-                lines.append(f"{names.get(c['contact_id'], c['contact_id'])}: {key.replace('_', ' ')} {before or 'none'} -> "
-                             f"{c[key]}")
-        elif op == "create_company":
-            lines.append(f"New company: {c['name']}")
-    lines += ["", "Flags: " + ("; ".join(preview["flags"]) if preview["flags"] else "none"), "", CONFIRM_LINE]
-    return "\n".join(lines)
+def card_reply(preview: dict[str, Any]) -> str:
+    """The words next to the read back card. The card itself shows every field that will be saved."""
+    vague = sum(1 for c in preview["changes"] for p in ("stated_time", "due") if c.get(f"{p}_note"))
+    odd = sum(1 for c in preview["changes"] for p in ("stated_time", "due") if c.get(f"{p}_warning"))
+    out = "Here's what I'll save."
+    if vague:
+        out += f" {NUMBERS[min(vague, 8)]} time{' was' if vague == 1 else 's were'} vague, so I kept your words."
+    if odd:
+        out += f" {NUMBERS[min(odd, 8)]} date{' needs' if odd == 1 else 's need'} a check."
+    return out + " Press Confirm, or tell me what to change."
+
+
+def _whois(chat: Chat, request: str, answer: str | None) -> list[dict[str, Any]]:
+    """A read only lookup: who someone is, their company, deals and the last note."""
+    query = _who(chat, request, answer)
+    companies = company_mentions(request)
+    if query is None and companies:
+        query = COMPANY_NAMES[companies[0]]
+    if query is None:
+        return [_text("Who should I look up?")]
+    if not chat.done("search_crm"):
+        return [chat.call("search_crm", query=query)]
+    contact, matches = _pick_contact(chat, query)
+    if contact is None and matches:
+        return [_ask_which(query, matches)]
+    if contact is None:
+        company = next((r for _, d, _ in chat.done("search_crm") for r in d.get("results", []) if r["type"] == "company"), None)
+        if company is None:
+            return [_text(f"I couldn't find {query} in the CRM.")]
+        rec = _record(chat, company["id"])
+        if rec is None:
+            return [chat.call("get_record", record_id=company["id"])]
+        people = ", ".join(f"{c['name']} ({c['job_title']})" for c in rec.get("contacts", [])) or "no contacts"
+        deals = "; ".join(f"{d['name']} ({d['stage']})" for d in rec.get("deals", [])) or "no deals"
+        return [_text(f"{rec['name']} ({rec.get('industry') or 'no industry noted'}). People: {people}. Deals: {deals}.")]
+    rec = _record(chat, contact["id"])
+    if rec is None:
+        return [chat.call("get_record", record_id=contact["id"])]
+    deals = "; ".join(f"{d['name']} ({d['stage']}, last activity {d['days_since_activity']} days ago)"
+                      for d in rec.get("deals", [])) or "none in the CRM"
+    notes = rec.get("recent_notes") or []
+    last = f" Last note: {notes[0]['summary']}." if notes else ""
+    return [_text(f"{rec['name']} is {rec['job_title']} at {rec['company']}. Deals: {deals}.{last}")]
 
 
 def _debrief(chat: Chat, request: str, answer: str | None) -> list[dict[str, Any]]:

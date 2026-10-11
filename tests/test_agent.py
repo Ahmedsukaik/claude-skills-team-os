@@ -171,7 +171,7 @@ def test_when_the_live_model_cannot_answer_the_fixed_rules_do_and_say_so(kind):
     assert [t["text"] for t in chat.view["transcript"] if t["kind"] == "system"] == [NOTES[kind]]
     if kind != "invalid":  # the service rests after a failure, so the whole reply comes from the fixed rules
         assert chat.reply()["mode"] == "guided" and chat.reply()["skills"] == ["house-rules", "weekly-pipeline"]
-    assert agent.live_available() is (kind == "invalid")  # a bad request is a problem of that one step: no rest
+    assert agent.live_available() is False  # the live model rests after any failure, a refused request included
 
 
 def test_a_visitor_over_the_limit_gets_the_fixed_rules():
@@ -223,3 +223,45 @@ def test_cost_and_usage_add_up_over_the_chat():
     m = chat.view["metrics"]
     assert m["live_calls"] == 4 and m["guided_calls"] == 0 and m["cost_usd"] > 0
     assert m["input_tokens"] == 4 * (1500 + 4000) and m["cached_tokens"] == 4 * 4000 and m["avg_ms"] == 900
+
+
+def test_a_date_cut_out_of_a_relative_phrase_is_refused():
+    said = "Called Ravi Menon. Follow up two weeks after Friday, October 23, 2026."
+    cut = [{"op": "create_task", "title": "Follow up with Ravi", "contact_id": "C-7", "due_text": "Friday, October 23, 2026"}]
+    whole = [{**cut[0], "due_text": "two weeks after Friday, October 23, 2026"}]
+    model = ScriptedModel([tool(1, "load_skill", name="house-rules")],
+                          [tool(2, "propose_write", summary="x", changes=cut)],
+                          [tool(3, "propose_write", summary="x", changes=whole)], [text("Read back ready.")])
+    chat = Chat(Agent(live=model))
+    chat.say(said)
+    refused = json.loads(last_tool_results(model.calls[2])[0]["content"])
+    assert refused["error"] == "time_not_stated" and "relative phrase" in refused["message"]
+    due = chat.view["pending"][0]["changes"][0]
+    assert due["due_text"] == "two weeks after Friday, October 23, 2026" and due["due"] is None  # kept as words
+
+
+def test_failed_live_calls_are_logged_without_secrets(caplog):
+    import anthropic
+    import httpx2
+    from conftest import free_port  # noqa: F401  (the same test helpers as the other files)
+
+    from teamos.models import ClaudeModel
+
+    response = httpx2.Response(400, headers={"request-id": "req_local_123"},
+                               request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages"))
+    error = anthropic.BadRequestError("messages.0: the prompt says SECRET-PROMPT-TEXT", response=response,
+                                      body={"error": {"message": "the prompt says SECRET-PROMPT-TEXT"}})
+
+    class Failing:
+        def __init__(self):
+            self.messages = self
+
+        def create(self, **kwargs):
+            raise error
+
+    model = ClaudeModel(client=Failing())
+    with caplog.at_level("WARNING", logger="teamos.models"), pytest.raises(ModelUnavailable):
+        model.respond("system", [], [{"role": "user", "content": "hi"}])
+    logged = " ".join(r.getMessage() for r in caplog.records)
+    assert "kind=invalid" in logged and "status=400" in logged and "req_local_123" in logged
+    assert "SECRET-PROMPT-TEXT" not in logged and "sk-" not in logged

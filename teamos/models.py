@@ -9,11 +9,13 @@ keyword rules (guided.py), and the page says so on every guided reply.
 """
 from __future__ import annotations
 
+import logging
 import os
 import time
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+log = logging.getLogger("teamos.models")
 DEFAULT_MODEL = "claude-haiku-5-5"
 # This build runs with thinking switched off, which Haiku 5.5 accepts at effort low to high.
 # Other current models refuse thinking "disabled", and keeping thinking on would mean storing
@@ -108,15 +110,15 @@ class ClaudeModel:
         try:
             response = self._client.messages.create(**self.request(system, tools, messages))
         except anthropic.RateLimitError as e:
-            raise ModelUnavailable("budget" if "enforced_spend_limit_reached" in str(_body(e)) else "rate_limited") from e
+            raise _failed("budget" if "enforced_spend_limit_reached" in str(_body(e)) else "rate_limited", e) from e
         except anthropic.BadRequestError as e:
             if "usage limits" in str(_body(e)).lower():
-                raise ModelUnavailable("budget") from e
-            raise ModelUnavailable("invalid", "bad request") from e
+                raise _failed("budget", e) from e
+            raise _failed("invalid", e, "bad request") from e
         except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
-            raise ModelUnavailable("auth") from e
+            raise _failed("auth", e) from e
         except anthropic.APIError as e:  # connection errors, timeouts, overloaded, 5xx
-            raise ModelUnavailable("error", type(e).__name__) from e
+            raise _failed("error", e, type(e).__name__) from e
         content = [_clean_block(b) for b in _get(response, "content") or []]
         usage_obj = _get(response, "usage")
         usage = {k: int(_get(usage_obj, k) or 0) for k in
@@ -124,6 +126,18 @@ class ClaudeModel:
         usage["cache_write_5m_tokens"] = int(_get(_get(usage_obj, "cache_creation"), "ephemeral_5m_input_tokens") or 0)
         return Turn([b for b in content if b], str(_get(response, "stop_reason") or "end_turn"),
                     str(_get(response, "model") or self.name), "live", usage, int((time.monotonic() - started) * 1000))
+
+
+def _failed(kind: str, error: Exception, detail: str = "") -> ModelUnavailable:
+    """Log a failed live call for the operator: the kind, the HTTP status and Anthropic's request id.
+    Never the key, the prompt or the error message (which can quote the request)."""
+    response = getattr(error, "response", None)
+    status = getattr(error, "status_code", None) or getattr(response, "status_code", None)
+    headers = getattr(response, "headers", None)
+    request_id = getattr(error, "request_id", None) or (headers.get("request-id") if headers is not None else None)
+    log.warning("live model call failed: kind=%s status=%s request_id=%s error=%s", kind, status, request_id,
+                type(error).__name__)
+    return ModelUnavailable(kind, detail)
 
 
 def _get(obj: Any, name: str) -> Any:

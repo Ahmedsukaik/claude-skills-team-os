@@ -2,8 +2,9 @@
 
     python -m evals                 the fixed rules, locally (no AI, no cost)
     python -m evals --live          Claude, locally (needs ANTHROPIC_API_KEY in the environment or .env)
-    python -m evals --url URL       through a deployed demo's HTTP API, whatever it runs, with a pause
-                                    between scenarios so the demo's per visitor limits are not hit
+    python -m evals --url URL       through a deployed demo's HTTP API, whatever it runs, 45 seconds
+                                    between chats so the demo's per visitor limits are not hit (a full
+                                    run is 60 chats: about an hour)
 
 Three kinds of cases:
 - triggering.jsonl: about 40 requests, each labelled with the skill that must load, or none. A
@@ -211,7 +212,11 @@ def run(runner: LocalRunner | HttpRunner, pause: float, only: set[str] | None = 
         record("behaviour", case, behave)
     for case in load("consistency.jsonl"):
         def consist(case: dict[str, Any] = case) -> tuple[list[str], float]:
-            views = [runner.chat([case["say"]], broker) for broker in case["brokers"]]
+            views = []
+            for i, broker in enumerate(case["brokers"]):
+                if i and pause:
+                    time.sleep(pause)  # each broker's chat is its own chat for the limits too
+                views.append(runner.chat([case["say"]], broker))
             return judge_consistency(case, views, runner.mode), sum(v["metrics"]["cost_usd"] for v in views)
         record("consistency", case, consist)
     summary = {kind: {"passed": sum(r["status"] == "pass" for r in results if r["kind"] == kind),
@@ -226,14 +231,14 @@ def main() -> int:
     target.add_argument("--live", action="store_true", help="use Claude locally (needs ANTHROPIC_API_KEY)")
     target.add_argument("--url", help="run through a deployed demo, e.g. https://example.vercel.app")
     parser.add_argument("--only", help="comma-separated case ids")
-    parser.add_argument("--pause", type=float, default=None, help="seconds between cases (default 0, or 20 with --url)")
+    parser.add_argument("--pause", type=float, default=None, help="seconds between chats (default 0, or 45 with --url)")
     parser.add_argument("--save", action="store_true", help="write the results to evals/results/")
     args = parser.parse_args()
     if args.live:
         from demo import load_env
         load_env(ROOT / ".env")
     runner: LocalRunner | HttpRunner = HttpRunner(args.url) if args.url else LocalRunner(args.live)
-    pause = args.pause if args.pause is not None else (20.0 if args.url else 0.0)
+    pause = args.pause if args.pause is not None else (45.0 if args.url else 0.0)
     print(f"Running the evaluation ({'fixed rules' if runner.mode == 'guided' else 'live AI'})\n")
     out = run(runner, pause, set(args.only.split(",")) if args.only else None)
     print()

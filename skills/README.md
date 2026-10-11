@@ -40,7 +40,7 @@ descriptions carry the triggering, and each follows the same three parts:
    record a voice note, what a deal stage means, what a sales pipeline is, or a lunch spot near
    a property. This stops a skill from firing when it should not.
 
-The evaluation in `evals/` checks both directions: 40 requests, each labelled with the skill
+The evaluation in `evals/` checks both directions: 41 requests, each labelled with the skill
 that must load or with none, including near misses.
 
 ## What is enforced where

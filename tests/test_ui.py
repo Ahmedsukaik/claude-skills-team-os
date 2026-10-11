@@ -73,6 +73,12 @@ def fully_visible(page, locator) -> None:
     assert box["y"] + box["height"] <= bottom + 1, (box, bottom)
 
 
+def words(locator) -> str:
+    """An element's text as written, with spaces tidied. Labels are drawn in uppercase by the
+    stylesheet, so inner_text() would read "SKILL USED"; the words themselves do not change."""
+    return " ".join((locator.text_content() or "").split())
+
+
 def no_sideways_scroll(page) -> None:
     assert page.evaluate("document.documentElement.scrollWidth") <= page.viewport_size["width"]
 
@@ -128,9 +134,9 @@ def test_what_each_step_shows(browser, site):
     button(page, "Send Priya's voice note").click()
     page.locator(".story-title", has_text="Your turn").wait_for()
     reply = page.locator(".bot").filter(has=page.locator(".skill")).last
-    assert "Skill used: Voice note debrief" in " ".join(reply.locator(".skill").inner_text().split())
+    assert "Skill used: Voice note debrief" in words(reply.locator(".skill"))
     assert "voice-note-debrief" not in page.locator("#story").inner_text() + reply.inner_text()  # people names, not code names
-    assert "Fixed rules" in reply.locator(".tag").inner_text()
+    assert "Fixed rules" in words(reply.locator(".tag"))
     card = page.locator(".rb").first
     assert '"yesterday afternoon"' in card.inner_text() and "Vague, so no date set" in card.inner_text()
     assert "When you confirm" in card.inner_text() and "Due Fri, Oct" in card.inner_text()
@@ -138,8 +144,8 @@ def test_what_each_step_shows(browser, site):
     page.locator("[data-confirm]").first.click()
     page.locator(".story-title", has_text="Saved").wait_for()
     note = page.locator(".rec", has_text="Tour of 310 Canal Street").first
-    assert "Recorded at (CRM clock)" in note.inner_text() and '"yesterday afternoon"' in note.inner_text()
-    assert "Saved one note and three tasks" in note.inner_text() and note.inner_text().count("Recorded at") == 1
+    assert "Recorded at (CRM clock)" in words(note) and '"yesterday afternoon"' in note.inner_text()
+    assert "Saved one note and three tasks" in note.inner_text() and words(note).count("Recorded at") == 1
     assert "one note and three tasks" in page.locator("#story").inner_text()
     button(page, "Next: try to skip the gate").click()
     button(page, "Send it").click()
@@ -148,8 +154,8 @@ def test_what_each_step_shows(browser, site):
     assert "still waits for Priya's confirm" in page.locator("#story").inner_text()
     gate_confirm = page.locator(".rb", has_text="Ravi").locator("[data-confirm]")
     assert "btn-secondary" in gate_confirm.get_attribute("class")  # the story is about what does not save
-    assert "Refused" in page.locator(".event").inner_text()
-    assert "Refused" in page.locator("#activity").inner_text()
+    assert "Refused" in words(page.locator(".event")) and page.locator(".event .stamp-refused").is_visible()
+    assert "Refused" in words(page.locator("#activity"))
     button(page, "Next: two people called Dana").click()
     button(page, "Send it").click()
     page.locator(".story-title", has_text="It asked").wait_for()
@@ -157,7 +163,7 @@ def test_what_each_step_shows(browser, site):
     button(page, "Next: when no skill fits").click()
     button(page, "Ask about lunch").click()
     page.locator(".story-title", has_text="What you just saw").wait_for()
-    assert "No skill used" in page.locator(".bot .skill").last.inner_text()
+    assert "No skill used" in words(page.locator(".bot .skill").last)
     story = page.locator("#story").inner_text()
     assert "What you just saw, and what it costs." in story and "cost nothing" in story and "Cost shows when the live AI" in story
     assert page.locator("#story .story-list li").count() == 5 and "Your version runs on your CRM" in story
@@ -251,7 +257,7 @@ def test_with_a_live_model_the_reply_is_marked_ai_and_the_crm_shows_the_cost(bro
         page.locator("#input").fill("Give me the weekly pipeline summary.")
         page.locator("#input").press("Enter")
         page.locator(".bot .tag", has_text="AI").wait_for()
-        assert "Skill used: Weekly pipeline" in " ".join(page.locator(".bot .skill").last.inner_text().split())
+        assert "Skill used: Weekly pipeline" in words(page.locator(".bot .skill").last)
         assert "AI cost of this chat: $0.0" in " ".join(page.locator("#cost-line").inner_text().split())
         context.close()
         assert errors == []
@@ -311,7 +317,7 @@ def test_a_badge_with_several_skills_wraps_instead_of_overflowing(browser):
         page.locator("#input").press("Enter")
         badge = page.locator(".bot .skill").last
         badge.wait_for()
-        assert "Skills used: Voice note debrief, Meeting prep, Weekly pipeline" in " ".join(badge.inner_text().split())
+        assert "Skills used: Voice note debrief, Meeting prep, Weekly pipeline" in words(badge)
         box, head = badge.bounding_box(), page.locator(".bot .bot-head").last.bounding_box()
         assert box["x"] + box["width"] <= head["x"] + head["width"] + 1 and box["x"] + box["width"] <= 360
         no_sideways_scroll(page)
@@ -319,3 +325,68 @@ def test_a_badge_with_several_skills_wraps_instead_of_overflowing(browser):
         assert errors == []
     finally:
         server.should_exit = True
+
+
+def test_the_first_screen_is_a_drawing_waiting_for_a_yes(browser, site):
+    context, page, errors = open_page(browser, site)
+    figure = page.locator(".hero-fig")
+    assert figure.is_visible() and figure.locator("svg.plan").get_attribute("aria-hidden") == "true"
+    assert "Waiting for Priya" in words(figure.locator(".tb")) and "yesterday afternoon" in words(figure.locator(".fig-quote"))
+    assert [" ".join(li.inner_text().split()) for li in page.locator(".hero-points li").all()] == [
+        "01 Voice note in, CRM note and tasks out", "02 A read back before every write", "03 Times are never guessed"]
+    assert page.locator(".layout").is_hidden()
+    page.wait_for_timeout(2000)  # the callout leaders draw in, then stay drawn
+    assert page.evaluate("getComputedStyle(document.querySelector('.fp-lead')).strokeDashoffset") in ("0", "0px")
+    context.close()
+    assert errors == []
+
+
+def test_the_pipeline_strip_counts_the_crm_and_marks_the_card(browser, site):
+    context, page, errors = open_page(browser, site)
+    cells = page.locator(".pipe-cell")
+    button(page, "Start the demo").click()
+    button(page, "Send Priya's voice note").click()
+    page.locator(".story-title", has_text="Your turn").wait_for()
+    assert [words(c.locator(".pipe-k")) + " " + words(c.locator("b")) for c in cells.all()] == [
+        "Lead 1", "Touring 2", "Proposal 1", "LOI 1", "Negotiation 1"]  # open deals in crm/data.py
+    assert cells.nth(1).get_attribute("class").split() == ["pipe-cell", "here"]  # Tessarine at 310 Canal is touring
+    assert page.locator(".pipe-cell.here").count() == 1
+    context.close()
+    assert errors == []
+
+
+def test_a_confirm_stamps_the_card_and_the_record(browser, site):
+    context, page, errors = open_page(browser, site)
+    button(page, "Start the demo").click()
+    button(page, "Send Priya's voice note").click()
+    page.locator(".story-title", has_text="Your turn").wait_for()
+    assert page.locator(".stamp").count() == 0  # nothing is stamped before the yes
+    page.locator("[data-confirm]").first.click()
+    page.locator(".story-title", has_text="Saved, with").wait_for()
+    card_stamp = page.locator(".rb .stamp-saved")
+    assert card_stamp.count() == 1 and words(card_stamp).startswith("Saved · ")
+    assert words(page.locator(".rb .tb-approve > span").first) == "Approved by"
+    assert words(page.locator(".rb .tb-approve b")) == "Priya Natarajan"
+    assert words(page.locator(".rec .stamp-saved")) == words(card_stamp)  # the same CRM clock time on both
+    context.close()
+    assert errors == []
+
+
+def test_motion_is_off_when_the_visitor_asks_for_less(browser, site):
+    context = browser.new_context(viewport={"width": 1440, "height": 900}, reduced_motion="reduce")
+    page = context.new_page()
+    page.goto(site + "/")
+    page.locator(".hero-fig").wait_for()
+    assert page.evaluate("getComputedStyle(document.querySelector('.fp-lead')).animationName") == "none"
+    assert page.evaluate("getComputedStyle(document.querySelector('.fp-lead')).strokeDashoffset") in ("0", "0px")
+    context.close()
+
+
+def test_dark_mode_is_blueprint_at_night(browser, site):
+    context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="dark")
+    page = context.new_page()
+    page.goto(site + "/")
+    page.locator(".hero-fig").wait_for()
+    assert page.evaluate("getComputedStyle(document.body).backgroundColor") == "rgb(11, 22, 40)"
+    assert page.evaluate("getComputedStyle(document.querySelector('.story-headline')).color") == "rgb(231, 238, 248)"
+    context.close()

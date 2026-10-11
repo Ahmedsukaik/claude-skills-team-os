@@ -338,7 +338,8 @@
     return `<div class="time-box ${exact ? "exact" : "flagged"}"><span>${esc(t.label)}</span><b>"${esc(t.text)}"</b>
       <small>${exact ? "Broker's words. Exact: " + esc(t.nice) : "Broker's words. Vague, so no date set"}</small></div>`;
   }
-  const systemBox = (at) => `<div class="time-box system"><span>Recorded at (CRM clock)</span><b>${at ? esc(day(at)) + ", " + esc(clock(at)) : "When you confirm"}</b><small>Set by the system, never typed</small></div>`;
+  const systemBox = (at, prepared) => `<div class="time-box system"><span>Recorded at (CRM clock)</span><b>${at ? esc(day(at)) + ", " + esc(clock(at)) : "When you confirm"}</b>
+    <small>${at || !prepared ? "Set by the system, never typed" : `Set by the system. Prepared at ${esc(clock(prepared))}`}</small></div>`;
   function dueChip(t) {
     if (!t || !t.text) return `<span class="due">No date given</span>`;
     if (t.nice && !t.note) return `<span class="due exact">Due ${esc(t.nice)}</span>`;
@@ -359,7 +360,7 @@
     const pill = status === "pending" ? `<span class="pill pill-pending">Waiting for your confirm</span>`
       : status === "committed" ? `<span class="pill pill-saved">Saved</span>`
       : `<span class="pill pill-quiet">${status === "expired" ? "Expired" : "Discarded"}</span>`;
-    const times = `<div class="times">${stated || ""}${systemBox(status === "committed" ? card.committed_at : null)}</div>`;
+    const times = `<div class="times">${stated || ""}${systemBox(status === "committed" ? card.committed_at : null, card.proposed_at)}</div>`;
     const foot = status === "pending"
       ? `${times}<div class="rb-actions"><span class="rb-note">Nothing is saved until you confirm.</span><button type="button" class="btn btn-secondary" data-discard="${esc(card.id)}">Discard</button>
          <button type="button" class="btn btn-primary${ring ? " ring" : ""}" data-confirm="${esc(card.id)}">${icon("check")}Confirm and save</button></div>`

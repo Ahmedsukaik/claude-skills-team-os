@@ -4,11 +4,11 @@
 {"id": "debrief-two-people", "skill": "voice-note-debrief", "say": "Toured 14 Elm Street with Dana Whitlock and Owen Prescott today. Dana counted 28 dock doors and needs 30. I need to send her the expansion plan."}
 {"id": "debrief-met-with", "skill": "voice-note-debrief", "say": "Met with Theo Ashby from Kilnworth Brewing at the Elm St warehouse. He's still interested but wants to wait until spring."}
 {"id": "debrief-spoke-with", "skill": "voice-note-debrief", "say": "Spoke with Lucia Ferrante about the Harbor Road space. She asked for the floor loading numbers."}
-{"id": "debrief-notes-from", "skill": "voice-note-debrief", "say": "Notes from my call with Gil Navarro: Pellucid needs 20 more desks. Follow up on October 30, 2026."}
+{"id": "debrief-notes-from", "skill": "voice-note-debrief", "say": "Notes from my call with Gil Navarro: Quorvane needs 20 more desks. Follow up on October 30, 2026."}
 {"id": "update-stage-ambiguous", "skill": "crm-update", "say": "Update Dana's deal to LOI signed."}
-{"id": "update-stage-company", "skill": "crm-update", "say": "Move the Pellucid deal to Closed won."}
+{"id": "update-stage-company", "skill": "crm-update", "say": "Move the Quorvane deal to Closed won."}
 {"id": "update-add-contact", "skill": "crm-update", "say": "Add a new contact: Nora Quist, nora.quist@example.com, at Kilnworth Brewing."}
-{"id": "update-email", "skill": "crm-update", "say": "Change Hana Sato's email to hana.sato@pellucid.example.com."}
+{"id": "update-email", "skill": "crm-update", "say": "Change Hana Sato's email to hana.sato@quorvane.example.com."}
 {"id": "update-title", "skill": "crm-update", "say": "Please update Gil Navarro's job title to Office Director."}
 {"id": "update-add-company", "skill": "crm-update", "say": "Add a company called Fernway Pharmacy."}
 {"id": "update-stage-mark", "skill": "crm-update", "say": "Mark Bramblecote Foods at 220 Harbor Road as Lease negotiation."}

@@ -11,7 +11,9 @@ The rules hold whoever calls: the model through a tool, the MCP server, or a tes
    person stated is kept in their words, and as a date only when the words are exact
    (timestamps.py). Callers cannot pass a date of their own: only the words.
 3. Duplicate check. Creating a contact with an email already in the CRM, or the same name at
-   the same company, is blocked and returns the match. The same for a company name.
+   the same company, is blocked and returns the match. The same for a company name. Names are
+   compared folded (text.py), and every change is checked against the CRM as it would be after
+   the earlier changes of the same write, so one write cannot hold two copies of a contact.
 4. Every read and write is logged: actor, action, detail, outcome, system time.
 """
 from __future__ import annotations
@@ -28,6 +30,7 @@ from typing import Any
 from . import data
 from .confirm import ConfirmPolicy
 from .errors import CRMError
+from .text import mixed_script, strip_control, words
 from .timestamps import nice, read_stated_time
 
 WRITE_TTL = timedelta(minutes=30)
@@ -46,7 +49,6 @@ OPS: dict[str, tuple[set[str], set[str]]] = {   # op: (required, optional)
 }
 LIST_FIELDS = {"discussed", "next_steps"}
 EMAIL = re.compile(r"^[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$")
-CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f​-‏⁠-⁤﻿]")
 WORDS_DROPPED = {"the", "a", "an", "of", "and", "for", "with", "from", "at", "to", "in", "on", "s", "co", "inc", "llc"}
 ID = re.compile(r"^(?:C|CO|D|P|N|T|E|W|M)-\d{1,5}$")
 KINDS = {"C": "contact", "CO": "company", "D": "deal", "P": "property", "N": "note", "T": "task", "E": "event", "M": "draft"}
@@ -61,7 +63,7 @@ def iso(moment: datetime) -> str:
 
 
 def tokens(text: str) -> list[str]:
-    return [t for t in re.findall(r"[a-z0-9]+", text.lower()) if t not in WORDS_DROPPED]
+    return [t for t in words(text) if t not in WORDS_DROPPED]
 
 
 def payload_hash(summary: str, changes: list[dict[str, Any]]) -> str:
@@ -72,7 +74,7 @@ def payload_hash(summary: str, changes: list[dict[str, Any]]) -> str:
 def _text(value: Any, name: str, limit: int) -> str:
     if not isinstance(value, str):
         raise CRMError("invalid", f"{name} must be text.")
-    value = " ".join(CONTROL.sub("", value).split())
+    value = " ".join(strip_control(value).split())
     if len(value) > limit:
         raise CRMError("invalid", f"{name} is too long (at most {limit} characters).")
     return value
@@ -287,7 +289,7 @@ class CRM:
             if not subject or not body:
                 raise CRMError("invalid", "A draft needs a subject and a body.")
         except CRMError as e:
-            self.write_log(actor, "draft email", e.message, e.outcome)
+            self.write_log(actor, "draft email", e.plain, e.outcome)
             raise
         draft = {"id": self._next("M"), "to": contact["email"], "to_name": contact["name"], "contact_id": contact_id,
                  "subject": subject, "body": body, "status": "draft", "created_at": self.now()}
@@ -305,9 +307,9 @@ class CRM:
             if not isinstance(changes, list) or not changes or len(changes) > MAX_CHANGES:
                 raise CRMError("invalid", f"changes must be a list of 1 to {MAX_CHANGES} changes.")
             inputs = [self._input(c) for c in changes]
-            normalized = [self._normalize(c) for c in inputs]
+            normalized = self._check_all(inputs)
         except CRMError as e:
-            self.write_log(actor, "propose write", f"{summary if isinstance(summary, str) else ''}: {e.message}"[:300],
+            self.write_log(actor, "propose write", f"{summary if isinstance(summary, str) else ''}: {e.plain}"[:300],
                            e.outcome)
             raise
         now = self.clock()
@@ -330,22 +332,28 @@ class CRM:
         write = self.writes.get(write_id) if isinstance(write_id, str) else None
         try:
             if write is None:
-                raise CRMError("unknown_write", f"There is no proposed write {write_id}. Propose it first.")
+                raise CRMError("unknown_write", f"There is no proposed write {write_id}. Propose it first.",
+                               plain="Nothing was proposed with that id, so nothing was saved.")
             if write["status"] == "committed":
-                raise CRMError("already_used", f"{write_id} was already saved. A write id works once.")
+                raise CRMError("already_used", f"{write_id} was already saved. A write id works once.",
+                               plain="Already saved. A read back saves once.")
             if write["status"] == "discarded":
-                raise CRMError("discarded", f"{write_id} was discarded. Propose it again if it is still wanted.")
+                raise CRMError("discarded", f"{write_id} was discarded. Propose it again if it is still wanted.",
+                               plain="This change was discarded. Nothing was saved.")
             if write["status"] == "expired" or self.clock() > datetime.fromisoformat(write["expires_at"].replace("Z", "+00:00")):
                 write["status"] = "expired"
-                raise CRMError("expired", f"{write_id} expired (a read back is valid for "
-                                          f"{int(WRITE_TTL.total_seconds() // 60)} minutes). Propose it again and read it back.")
+                minutes = int(WRITE_TTL.total_seconds() // 60)
+                raise CRMError("expired", f"{write_id} expired (a read back is valid for {minutes} minutes). Propose it "
+                                          "again and read it back.",
+                               plain=f"The read back expired after {minutes} minutes. Nothing was saved.")
             if payload_hash_given != write["hash"] or payload_hash(write["summary"], write["changes"]) != write["hash"]:
                 raise CRMError("changed", "The payload does not match what was read back. Nothing was saved. Propose it "
-                                          "again and read it back.")
+                                          "again and read it back.",
+                               plain="What was read back does not match, so nothing was saved.")
             how = self.confirm.check(write, confirmation)
             self._still_valid(write)
         except CRMError as e:
-            self.write_log(actor, "save", e.message, e.outcome, str(write_id)[:40])
+            self.write_log(actor, "save", e.plain, e.outcome, str(write_id)[:40])
             raise
         saved = [self._apply(c, write["id"]) for c in write["changes"]]
         write["status"], write["committed_at"] = "committed", self.now()
@@ -370,41 +378,69 @@ class CRM:
 
     def _still_valid(self, write: dict[str, Any]) -> None:
         """Between the read back and the confirm the CRM may have changed: check every change again."""
-        for raw, previewed in zip(write["input"], write["changes"], strict=True):
-            try:
-                again = self._normalize(raw)
-            except CRMError as e:
-                raise CRMError("stale", f"The CRM changed since the read back: {e.message} Nothing was saved.",
-                               outcome=e.outcome, **e.extra) from e
-            if again != previewed:
-                raise CRMError("stale", "The CRM changed since the read back. Nothing was saved. Propose it again.")
+        try:
+            again = self._check_all(write["input"])
+        except CRMError as e:
+            raise CRMError("stale", f"The CRM changed since the read back: {e.message} Nothing was saved.",
+                           outcome=e.outcome, plain=f"The CRM changed since the read back: {e.plain} Nothing was saved.",
+                           **e.extra) from e
+        if again != write["changes"]:
+            raise CRMError("stale", "The CRM changed since the read back. Nothing was saved. Propose it again.",
+                           plain="The CRM changed since the read back. Nothing was saved.")
+
+    def _check_all(self, inputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Check each change against the CRM as it would be after the earlier changes of the same
+        write, so two creates of one contact, "Acme" and "Acme Inc", or an update and a create to
+        the same email are caught inside one write. A record may be changed once per write."""
+        sim = CRM(self.today, self.confirm, self.user, self.clock, copy.deepcopy(self.records), counters=dict(self.counters))
+        changed: set[str] = set()
+        out = []
+        for raw in inputs:
+            c = sim._normalize(raw)
+            target = c.get("contact_id") if c["op"] == "update_contact" else c.get("deal_id") if c["op"] == "update_deal_stage" \
+                else None
+            if target in changed:
+                raise CRMError("invalid", f"{target} is changed twice in one write. Make one change per record.",
+                               plain="One record is changed twice in the same write. Nothing was proposed.")
+            if target:
+                changed.add(target)
+            sim._apply(c, "W-check")
+            out.append(c)
+        return out
 
     # ------------------------------------------------------------------ checking one change
     def _input(self, raw: Any) -> dict[str, Any]:
-        """Keep the fields a change may carry. Empty values count as not given."""
+        """Keep the fields a change may carry. A value that is empty once cleaned (spaces, zero
+        width characters) counts as not given, so a required field cannot be blank."""
         if not isinstance(raw, dict):
             raise CRMError("invalid", "Each change must be an object with an op.")
         op = raw.get("op")
         if op not in OPS:
             raise CRMError("invalid", f"Unknown op {op!r}. Use one of: {', '.join(OPS)}.")
         required, optional = OPS[op]
-        given = {k: v for k, v in raw.items() if k != "op" and v not in (None, "", [])}
-        extra = sorted(set(given) - required - optional)
-        if extra:
-            raise CRMError("invalid", f"{op} does not take {', '.join(extra)}.")
-        missing = sorted(required - set(given))
-        if missing:
-            raise CRMError("invalid", f"{op} needs {', '.join(missing)}.")
         out: dict[str, Any] = {"op": op}
-        for key in sorted(given):
-            value = given[key]
-            if key in LIST_FIELDS:
+        extra = []
+        for key in sorted(k for k in raw if k != "op"):
+            value = raw[key]
+            if value is None or value == "" or value == []:
+                continue
+            if key not in required | optional:
+                extra.append(key)
+            elif key in LIST_FIELDS:
                 if not isinstance(value, list) or len(value) > MAX_LIST:
                     raise CRMError("invalid", f"{key} must be a list of at most {MAX_LIST} short items.")
-                items = [_text(v, key, LIMITS["item"]) for v in value]
-                out[key] = [v for v in items if v]
+                items = [v for v in (_text(v, key, LIMITS["item"]) for v in value) if v]
+                if items:
+                    out[key] = items
             else:
-                out[key] = _text(value, key, LIMITS.get(key, 40))
+                cleaned = _text(value, key, LIMITS.get(key, 40))
+                if cleaned:
+                    out[key] = cleaned
+        if extra:
+            raise CRMError("invalid", f"{op} does not take {', '.join(extra)}.")
+        missing = sorted(required - set(out))
+        if missing:
+            raise CRMError("invalid", f"{op} needs {', '.join(missing)} (an empty value does not count).")
         return out
 
     def _normalize(self, c: dict[str, Any]) -> dict[str, Any]:
@@ -434,6 +470,7 @@ class CRM:
             out.update(read_stated_time(c.get("due_text"), self.today, "future").as_fields("due"))
         elif op == "create_contact":
             self._need(c["company_id"], "CO", "company_id")
+            _one_alphabet(c["first_name"], c["last_name"])
             out["email"] = email = c["email"].lower()
             if not EMAIL.match(email):
                 raise CRMError("invalid", f"{c['email']} is not a valid email address.")
@@ -441,7 +478,8 @@ class CRM:
             if match:
                 raise CRMError("duplicate_contact", f"{match['name']} ({match['email']}) is already in the CRM as "
                                                     f"{match['id']}. Nothing new was created; update that contact instead.",
-                               outcome="blocked", match=self._brief("contact", match))
+                               outcome="blocked", plain=f"{match['name']} is already in the CRM. Nothing new was created.",
+                               match=self._brief("contact", match))
         elif op == "update_contact":
             contact = self._need(c["contact_id"], "C", "contact_id")
             if "email" not in c and "job_title" not in c:
@@ -453,16 +491,19 @@ class CRM:
                 other = next((x for x in self.contacts.values() if x["email"] == email and x["id"] != contact["id"]), None)
                 if other:
                     raise CRMError("duplicate_contact", f"{email} already belongs to {other['name']} ({other['id']}).",
-                                   outcome="blocked", match=self._brief("contact", other))
+                                   outcome="blocked", plain=f"That email already belongs to {other['name']}. Nothing was "
+                                                            "changed.", match=self._brief("contact", other))
             out["before"] = {k: contact[k] for k in ("email", "job_title") if k in c}
             if all(out[k] == contact[k] for k in out["before"]):
                 raise CRMError("no_change", f"{contact['name']} already has those details.")
         elif op == "create_company":
+            _one_alphabet(c["name"])
             key = " ".join(tokens(c["name"]))
-            match = next((co for co in self.companies.values() if " ".join(tokens(co["name"])) == key), None)
+            match = next((co for co in self.companies.values() if key and " ".join(tokens(co["name"])) == key), None)
             if match:
                 raise CRMError("duplicate_company", f"{match['name']} is already in the CRM as {match['id']}.",
-                               outcome="blocked", match=self._brief("company", match))
+                               outcome="blocked", plain=f"{match['name']} is already in the CRM. Nothing new was created.",
+                               match=self._brief("company", match))
         elif op == "update_deal_stage":
             deal = self._need(c["deal_id"], "D", "deal_id")
             stage = next((s for s in data.STAGES if s.lower() == c["stage"].lower()), None)
@@ -476,11 +517,12 @@ class CRM:
         return out
 
     def _duplicate_contact(self, email: str, first: str, last: str, company_id: str) -> dict[str, Any] | None:
-        name = (" ".join(tokens(first)), " ".join(tokens(last)))
+        name = (" ".join(words(first)), " ".join(words(last)))
         for x in self.contacts.values():
             if x["email"] == email:
                 return x
-            if (" ".join(tokens(x["first_name"])), " ".join(tokens(x["last_name"]))) == name and x["company_id"] == company_id:
+            if all(name) and (" ".join(words(x["first_name"])), " ".join(words(x["last_name"]))) == name \
+                    and x["company_id"] == company_id:
                 return x
         return None
 
@@ -494,14 +536,15 @@ class CRM:
                    "deal_id": c.get("deal_id"), "property_id": c.get("property_id"), "summary": c["summary"],
                    "discussed": c.get("discussed", []), "next_steps": c.get("next_steps", []),
                    "stated_time_text": c["stated_time_text"], "stated_time": c["stated_time"],
-                   "stated_time_note": c["stated_time_note"], **base}
+                   "stated_time_note": c["stated_time_note"], "stated_time_warning": c["stated_time_warning"], **base}
             self.records["notes"][rec["id"]] = rec
             if rec["deal_id"]:
                 self.deals[rec["deal_id"]]["last_activity"] = self.clock().date().isoformat()
             return {"id": rec["id"], "kind": "note", "label": rec["summary"]}
         if op == "create_task":
             rec = {"id": self._next("T"), "title": c["title"], "contact_id": c.get("contact_id"), "deal_id": c.get("deal_id"),
-                   "status": "open", "due_text": c["due_text"], "due": c["due"], "due_note": c["due_note"], **base}
+                   "status": "open", "due_text": c["due_text"], "due": c["due"], "due_note": c["due_note"],
+                   "due_warning": c["due_warning"], **base}
             self.records["tasks"][rec["id"]] = rec
             return {"id": rec["id"], "kind": "task", "label": rec["title"]}
         if op == "create_contact":
@@ -523,7 +566,8 @@ class CRM:
             return {"id": rec["id"], "kind": "company", "label": rec["name"]}
         deal = self.deals[c["deal_id"]]
         deal.update(stage=c["stage"], stage_changed_at=now, stage_changed_by=self.user, last_activity=self.clock().date().isoformat(),
-                    stage_stated_time_text=c["stated_time_text"], stage_stated_time=c["stated_time"])
+                    stage_stated_time_text=c["stated_time_text"], stage_stated_time=c["stated_time"],
+                    stage_stated_time_note=c["stated_time_note"], stage_stated_time_warning=c["stated_time_warning"])
         return {"id": deal["id"], "kind": "deal", "label": f"{deal['name']}: {c['before']['stage']} -> {c['stage']}"}
 
     # ------------------------------------------------------------------ the read back, in plain words
@@ -545,7 +589,9 @@ class CRM:
                 item["time"] = _time_view("When it happened", c, "stated_time")
             elif op == "create_task":
                 item["heading"] = "Task"
-                item["rows"] = [["Task", c["title"]]] + ([["For", self.label(c["contact_id"])]] if c.get("contact_id") else [])
+                item["rows"] = [["Task", c["title"]],
+                                ["For", self.label(c["contact_id"]) if c.get("contact_id") else "no contact"],
+                                ["Deal", self.label(c["deal_id"]) if c.get("deal_id") else "no deal"]]
                 item["time"] = _time_view("Due", c, "due")
             elif op == "create_contact":
                 item["heading"] = "New contact"
@@ -576,25 +622,36 @@ def _counted(saved: list[dict[str, Any]]) -> str:
     return " and ".join(f"{n} {kind}{'' if n == 1 else 's'}" for kind, n in counts.items())
 
 
+def _one_alphabet(*names: str) -> None:
+    for name in names:
+        word = mixed_script(name)
+        if word:
+            raise CRMError("invalid", f"'{word}' mixes letters from different alphabets, which usually means a lookalike "
+                                      "character. Ask the person to type the name again.",
+                           plain=f"'{word}' mixes letters from different alphabets. Nothing was proposed.")
+
+
 def _text_block(value: Any) -> str:
     if not isinstance(value, str):
         raise CRMError("invalid", "body must be text.")
-    value = CONTROL.sub("", value).strip()
+    value = strip_control(value).strip()
     if len(value) > 4000:
         raise CRMError("invalid", "body is too long (at most 4000 characters).")
     return value
 
 
 def _flags(changes: list[dict[str, Any]]) -> list[str]:
+    """Everything the person should check: a time kept as words, and a date that looks odd."""
     flags = []
     for c in changes:
         for prefix in ("stated_time", "due"):
-            note = c.get(f"{prefix}_note")
-            if note:
-                flags.append(f"'{c[prefix + '_text']}': {note}")
+            for kind in ("note", "warning"):
+                said = c.get(f"{prefix}_{kind}")
+                if said:
+                    flags.append(f"'{c[prefix + '_text']}': {said}")
     return flags
 
 
 def _time_view(label: str, c: dict[str, Any], prefix: str) -> dict[str, Any]:
     return {"label": label, "text": c.get(f"{prefix}_text"), "value": c.get(prefix), "nice": nice(c.get(prefix)),
-            "note": c.get(f"{prefix}_note")}
+            "note": c.get(f"{prefix}_note"), "warning": c.get(f"{prefix}_warning")}

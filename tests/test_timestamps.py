@@ -5,7 +5,7 @@ from datetime import date
 
 import pytest
 
-from crm.timestamps import nice, read_stated_time
+from crm.timestamps import nice, read_stated_time, relative_near
 
 TODAY = date(2026, 10, 12)
 
@@ -21,7 +21,7 @@ TODAY = date(2026, 10, 12)
     ("23 October 2026", "2026-10-23"),
     ("the 23rd of October 2026", "2026-10-23"),
     ("on October 23, 2026 at 3:30 pm", "2026-10-23T15:30"),
-    ("by 23 October 2026, 15:00", "2026-10-23T15:00"),
+    ("due 23 October 2026, 15:00", "2026-10-23T15:00"),
     ("October 23, 2026 at 9am", "2026-10-23T09:00"),
     ("October 23, 2026 at noon", "2026-10-23T12:00"),
     ("October 23, 2026 at 12 a.m.", "2026-10-23T00:00"),
@@ -43,7 +43,8 @@ def test_exact_words_become_a_date(words, value):
     ("October 23", "No year"),                  # the year would be a guess
     ("Friday the 23rd", "Vague"),               # no month and no year
     ("23rd of October", "No year"),
-    ("10/23/2026", "numbers only"),             # month and day order is not certain
+    ("10/11/2026", "numbers only"),             # October 11 or November 10
+    ("10/23/2026", "numbers only"),             # numbers only, even when only one order is possible
     ("23.10.2026", "numbers only"),
     ("Thursday, October 23, 2026", "weekday"),  # it is a Friday
     ("February 30, 2026", "Not a real date"),
@@ -74,9 +75,34 @@ def test_today_only_adds_a_warning_never_a_value():
 def test_the_fields_a_record_stores():
     fields = read_stated_time("yesterday afternoon", TODAY).as_fields("stated_time")
     assert fields == {"stated_time_text": "yesterday afternoon", "stated_time": None,
-                      "stated_time_note": "Vague: kept as the person's words. No date is set."}
+                      "stated_time_note": "Vague: kept as the person's words. No date is set.", "stated_time_warning": None}
     assert read_stated_time("October 23, 2026", TODAY).as_fields("due") == {"due_text": "October 23, 2026", "due": "2026-10-23",
-                                                                          "due_note": None}
+                                                                          "due_note": None, "due_warning": None}
+
+
+def test_a_date_with_a_warning_is_still_a_date_and_the_warning_is_kept_apart():
+    fields = read_stated_time("by October 1, 2026", TODAY, expect="future").as_fields("due")
+    assert fields["due"] == "2026-10-01" and fields["due_note"] is None
+    assert "deadline" in fields["due_warning"] and "already past" in fields["due_warning"]
+
+
+@pytest.mark.parametrize("words", ["before October 23, 2026", "not before October 23, 2026", "two weeks after October 23, 2026",
+                                   "until October 23, 2026", "around October 23, 2026", "October 23, 2026 or so"])
+def test_a_relative_phrase_around_a_date_stays_words(words):
+    assert read_stated_time(words, TODAY).value is None
+
+
+@pytest.mark.parametrize("text, date_part, near", [
+    ("Follow up two weeks after Friday, October 23, 2026 please", "Friday, October 23, 2026", "two weeks"),
+    ("Call him not before October 30, 2026.", "October 30, 2026", "not"),
+    ("Send it within 3 days of October 30, 2026", "October 30, 2026", "within"),
+    ("Follow up on October 30, 2026 or so", "October 30, 2026", "or so"),
+    ("Follow up with Marcus on Friday, October 23, 2026.", "Friday, October 23, 2026", None),
+    ("We talked about the roof. Follow up on October 30, 2026.", "October 30, 2026", None),
+])
+def test_relative_words_next_to_a_date_are_found(text, date_part, near):
+    start = text.index(date_part)
+    assert relative_near(text, start, start + len(date_part)) == near
 
 
 def test_dates_read_nicely():

@@ -29,8 +29,9 @@ async def test_the_server_lists_the_tools_the_skills_use(mcp_crm: CRM):
     async with Client(build_server(mcp_crm)) as client:
         tools = {t.name: t for t in (await client.list_tools()).tools}
     assert set(tools) == TOOLS
-    assert tools["search_crm"].annotations.read_only_hint is True
-    assert tools["propose_write"].annotations.read_only_hint is False
+    read_only, propose = tools["search_crm"].annotations, tools["propose_write"].annotations
+    assert read_only is not None and read_only.read_only_hint is True
+    assert propose is not None and propose.read_only_hint is False
     commit = tools["commit_write"].input_schema
     assert set(commit["required"]) == {"write_id", "payload_hash", "user_confirmation"}
     change = tools["propose_write"].input_schema["$defs"]["Change"]
@@ -115,3 +116,15 @@ def test_the_server_starts_on_stdio_and_answers_a_client():
     except (OSError, subprocess.SubprocessError) as e:  # pragma: no cover - a locked down machine
         pytest.skip(f"cannot start a subprocess here: {e}")
     assert set(names) == TOOLS
+
+
+async def test_the_server_reads_today_on_every_call(mcp_crm: CRM):
+    from datetime import date, timedelta
+
+    from mcp import Client
+    days = {"today": date(2026, 10, 12)}
+    async with Client(build_server(mcp_crm, today=lambda: days["today"])) as client:
+        _, first = await call(client, "get_record", {"record_id": "D-1"})
+        days["today"] += timedelta(days=30)  # the server kept running for a month
+        _, later = await call(client, "get_record", {"record_id": "D-1"})
+    assert later["days_since_activity"] == first["days_since_activity"] + 30 and later["stale"] and not first["stale"]

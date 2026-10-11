@@ -68,7 +68,9 @@ class Change(BaseModel):
     stage: str | None = Field(None, description="update_deal_stage: one of " + ", ".join(crm_data.STAGES))
 
 
-def build_server(crm: CRM, actor: str | None = None) -> MCPServer:
+def build_server(crm: CRM, actor: str | None = None, today: Callable[[], date] = date.today) -> MCPServer:
+    """`today` is read on every call: a server left running for days still flags stale deals, past
+    due dates and tomorrow's meetings against the real date."""
     who = actor or f"Claude via MCP for {crm.user}"
     server = MCPServer("brokerage-crm", instructions=INSTRUCTIONS, version="1.0.0")
 
@@ -76,6 +78,7 @@ def build_server(crm: CRM, actor: str | None = None) -> MCPServer:
         def decorator(fn: Callable[..., Awaitable[dict[str, Any]]]) -> Any:
             @functools.wraps(fn)
             async def guarded(*args: Any, **kwargs: Any) -> dict[str, Any]:
+                crm.today = today()
                 try:
                     return await fn(*args, **kwargs)
                 except CRMError as e:  # the CRM already logged it; the model gets the reason in plain words

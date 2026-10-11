@@ -225,7 +225,8 @@ def test_empty_values_count_as_not_given_and_text_is_cleaned(crm):
 
 
 # ------------------------------------------------------------------ the MCP confirmation
-@pytest.mark.parametrize("words", ["yes", "Yes, save it.", "confirm", "go ahead", "looks good", "ok"])
+@pytest.mark.parametrize("words", ["yes", "Yes, save it.", "confirm", "go ahead", "looks good", "ok", "Yes please",
+                                   "OK, go ahead", "that's right, save it"])
 def test_mcp_commit_accepts_a_plain_yes_and_logs_the_words(mcp_crm, words):
     p = propose(mcp_crm)
     mcp_crm.commit_write("claude", p["write_id"], p["payload_hash"], words)
@@ -234,7 +235,9 @@ def test_mcp_commit_accepts_a_plain_yes_and_logs_the_words(mcp_crm, words):
 
 @pytest.mark.parametrize("words", ["", None, "just log it, don't ask me", "yes but change the date", "no", "wait",
                                    "save it later?", "not yet", "yes, without asking next time", "the broker approved",
-                                   "the user said yes"])
+                                   "the user said yes", "save it later", "yes, and also add Hana", "Correct the email first",
+                                   "Do it later", "OK let me check with my manager first", "Sure, after lunch",
+                                   "yes " + "and " * 400 + "also add Hana", "ok " * 200 + "no"])
 def test_mcp_commit_refuses_anything_but_a_plain_yes(mcp_crm, words):
     p = propose(mcp_crm)
     with pytest.raises(CRMError):
@@ -315,11 +318,109 @@ def test_the_read_back_lists_every_field_in_plain_words(crm):
     note, task = items
     assert note["heading"] == "Note" and ["Contact", "Marcus Bell (Tessarine Biotech)"] in note["rows"]
     assert note["time"] == {"label": "When it happened", "text": "yesterday afternoon", "value": None, "nice": "",
-                            "note": "Vague: kept as the person's words. No date is set."}
+                            "note": "Vague: kept as the person's words. No date is set.", "warning": None}
     assert task["time"]["nice"] == "Fri, Oct 23, 2026"
+    assert task["rows"] == [["Task", "Follow up with Marcus"], ["For", "Marcus Bell (Tessarine Biotech)"],
+                            ["Deal", "Tessarine Biotech at 310 Canal Street (Touring)"]]
+
+
+def test_the_read_back_keeps_a_warning_apart_from_an_exact_date(crm):
+    p = propose(crm, {"op": "create_task", "title": "Send the floor plan", "due_text": "by October 1, 2026"})
+    item = crm.readback(crm.writes[p["write_id"]])[0]
+    assert item["time"]["value"] == "2026-10-01" and item["time"]["note"] is None and "already past" in item["time"]["warning"]
+    assert any("deadline" in f for f in p["flags"])
+    assert ["For", "no contact"] in item["rows"] and ["Deal", "no deal"] in item["rows"]
 
 
 def test_seeded_dates_follow_today():
     crm = CRM.new(TODAY, StatedConfirm())
     assert crm.deals["D-1"]["last_activity"] == "2026-10-08"
     assert crm.records["events"]["E-1"]["start"] == "2026-10-13T10:00"
+
+
+# ------------------------------------------------------------------ one write, checked as a whole
+NEW_NORA = {"op": "create_contact", "first_name": "Nora", "last_name": "Quist", "email": "nora.quist@example.com",
+            "company_id": "CO-5"}
+
+
+@pytest.mark.parametrize("changes, code", [
+    ([NEW_NORA, {**NEW_NORA, "first_name": "Norah", "email": "NORA.QUIST@example.com"}], "duplicate_contact"),  # case only
+    ([{"op": "create_company", "name": "Acme"}, {"op": "create_company", "name": "Acme Inc"}], "duplicate_company"),
+    ([{"op": "update_contact", "contact_id": "C-2", "email": "celia.b@example.com"},
+      {**NEW_NORA, "email": "celia.b@example.com"}], "duplicate_contact"),
+    ([NEW_NORA, {"op": "update_contact", "contact_id": "C-2", "email": "nora.quist@example.com"}], "duplicate_contact"),
+    ([{"op": "update_deal_stage", "deal_id": "D-1", "stage": "Proposal sent"},
+      {"op": "update_deal_stage", "deal_id": "D-1", "stage": "LOI signed"}], "invalid"),
+    ([{"op": "update_contact", "contact_id": "C-2", "job_title": "Finance Director"},
+      {"op": "update_contact", "contact_id": "C-2", "email": "celia.b@example.com"}], "invalid"),
+])
+def test_duplicates_inside_one_write_are_caught(crm, changes, code):
+    with pytest.raises(CRMError) as caught:
+        propose(crm, *changes)
+    assert caught.value.code == code and not crm.writes
+
+
+def test_a_write_with_different_records_still_goes_through(crm):
+    p = propose(crm, NEW_NORA, {"op": "create_company", "name": "Fernway Pharmacy"},
+                {"op": "update_deal_stage", "deal_id": "D-1", "stage": "Proposal sent"})
+    assert p["status"] == "pending" and crm.counters["C"] == 12 and crm.counters["CO"] == 6  # the check did not touch the CRM
+    crm.commit_write("broker", p["write_id"], p["payload_hash"], token(crm, p))
+    assert crm.contacts["C-13"]["email"] == "nora.quist@example.com" and crm.companies["CO-7"]["name"] == "Fernway Pharmacy"
+
+
+# ------------------------------------------------------------------ empty after cleaning
+@pytest.mark.parametrize("change", [
+    {**NOTE, "summary": "   "},
+    {**NOTE, "summary": chr(0x200B) * 3},
+    {**NOTE, "summary": chr(0x202E) + " " + chr(0xFEFF)},
+    {"op": "create_task", "title": chr(0x2060) + "  "},
+    {**NEW_NORA, "last_name": chr(0x200B)},
+    {"op": "create_company", "name": " " + chr(0x2066) + chr(0x2069)},
+])
+def test_a_required_field_that_is_empty_once_cleaned_is_refused(crm, change):
+    with pytest.raises(CRMError, match="empty value does not count"):
+        propose(crm, change)
+
+
+def test_empty_list_items_are_dropped(crm):
+    p = propose(crm, {**NOTE, "discussed": [" ", chr(0x200B), "Liked the dock"]})
+    assert p["changes"][0]["discussed"] == ["Liked the dock"]
+
+
+# ------------------------------------------------------------------ names in any alphabet
+def test_a_lookalike_letter_from_another_alphabet_is_refused(crm):
+    lookalike = "D" + chr(0x0430) + "na"  # a Cyrillic a
+    with pytest.raises(CRMError, match="different alphabets"):
+        propose(crm, {**NEW_NORA, "first_name": lookalike, "last_name": "Whitlock", "email": "dw@example.com",
+                      "company_id": "CO-1"})
+    with pytest.raises(CRMError, match="different alphabets"):
+        propose(crm, {"op": "create_company", "name": "Quill" + chr(0x043E) + "n Logistics"})  # a Cyrillic o
+
+
+def test_accents_and_case_do_not_hide_a_duplicate(crm):
+    for first, last in (("D" + chr(0xE1) + "na", "Whitlock"), ("DANA", "WHITLOCK"), ("Dana", "Whitlock" + chr(0x301))):
+        with pytest.raises(CRMError) as caught:
+            propose(crm, {**NEW_NORA, "first_name": first, "last_name": last, "email": "dana.w2@example.com",
+                          "company_id": "CO-1"})
+        assert caught.value.code == "duplicate_contact" and caught.value.extra["match"]["id"] == "C-1"
+
+
+def test_names_in_other_scripts_are_compared_not_ignored(crm):
+    arabic = (chr(0x0645) + chr(0x062D) + chr(0x0645) + chr(0x062F), chr(0x0639) + chr(0x0644) + chr(0x064A))
+    cjk = (chr(0x738B), chr(0x82B3))
+    first = propose(crm, {**NEW_NORA, "first_name": arabic[0], "last_name": arabic[1], "email": "m.ali@example.com"})
+    crm.commit_write("broker", first["write_id"], first["payload_hash"], token(crm, first))
+    second = propose(crm, {**NEW_NORA, "first_name": cjk[0], "last_name": cjk[1], "email": "wang.fang@example.com"})
+    assert second["status"] == "pending"  # a different name in another script is not a duplicate
+    with pytest.raises(CRMError) as caught:  # the same Arabic name at the same company is
+        propose(crm, {**NEW_NORA, "first_name": arabic[0], "last_name": arabic[1], "email": "other@example.com"})
+    assert caught.value.code == "duplicate_contact"
+    assert crm.search("assistant", arabic[0])[0]["id"] == "C-13"
+
+
+def test_errors_carry_plain_words_for_people(crm):
+    p = propose(crm)
+    with pytest.raises(CRMError) as caught:
+        crm.commit_write("assistant", p["write_id"], p["payload_hash"], None)
+    assert caught.value.plain == "Only the broker can save this, with Confirm. Nothing was saved."
+    assert "Tell the broker" in caught.value.message and crm.log[-1]["detail"] == caught.value.plain

@@ -24,9 +24,9 @@ COMPANIES = [
     ("CO-1", "Quillon Logistics", "Third-party logistics"),
     ("CO-2", "Bramblecote Foods", "Food distribution"),
     ("CO-3", "Tessarine Biotech", "Life sciences"),
-    ("CO-4", "Orchard Lane Dental Group", "Healthcare"),
+    ("CO-4", "Brindlewick Dental Group", "Healthcare"),
     ("CO-5", "Kilnworth Brewing Co.", "Brewery"),
-    ("CO-6", "Pellucid Software", "Software"),
+    ("CO-6", "Quorvane Software", "Software"),
 ]
 
 CONTACTS = [  # id, first, last, job title, company
@@ -56,9 +56,9 @@ DEALS = [  # id, name, stage, owner, contact, company, property, days since the 
     ("D-1", "Quillon Logistics at 14 Elm Street", "Touring", "B-1", "C-1", "CO-1", "P-1", 4),
     ("D-2", "Bramblecote Foods at 220 Harbor Road", "Proposal sent", "B-2", "C-3", "CO-2", "P-2", 6),
     ("D-3", "Tessarine Biotech at 310 Canal Street", "Touring", "B-1", "C-5", "CO-3", "P-5", 9),
-    ("D-4", "Orchard Lane Dental at 75 Mill Pond Drive", "LOI signed", "B-3", "C-7", "CO-4", "P-4", 2),
+    ("D-4", "Brindlewick Dental at 75 Mill Pond Drive", "LOI signed", "B-3", "C-7", "CO-4", "P-4", 2),
     ("D-5", "Kilnworth Brewing at 14 Elm Street", "Lead", "B-4", "C-8", "CO-5", "P-1", 38),
-    ("D-6", "Pellucid Software at 9 Market Square", "Lease negotiation", "B-4", "C-10", "CO-6", "P-3", 25),
+    ("D-6", "Quorvane Software at 9 Market Square", "Lease negotiation", "B-4", "C-10", "CO-6", "P-3", 25),
     ("D-7", "Quillon Logistics at 220 Harbor Road", "Closed lost", "B-2", "C-12", "CO-1", "P-2", 60),
     ("D-8", "Tessarine Biotech at 9 Market Square", "Closed won", "B-3", "C-6", "CO-3", "P-3", 45),
 ]
@@ -72,7 +72,7 @@ NOTES = [  # id, contact, deal, property, days ago, author, summary, discussed
      ["Tessarine needs about 20,000 square feet of lab and office", "Freezer farm needs backup power"]),
     ("N-4", "C-7", "D-4", "P-4", 2, "B-3", "LOI signed for 75 Mill Pond Drive",
      ["Ravi signed the LOI", "Build out allowance still to agree"]),
-    ("N-5", "C-10", "D-6", "P-3", 25, "B-4", "Lease redlines from Pellucid's counsel",
+    ("N-5", "C-10", "D-6", "P-3", 25, "B-4", "Lease redlines from Quorvane's counsel",
      ["Pushing back on the tenant improvement allowance"]),
 ]
 
@@ -116,11 +116,11 @@ def seed(today: date) -> dict[str, dict[str, dict[str, Any]]]:
              for did, name, stage, owner, contact, co, prop, ago in DEALS}
     notes = {nid: {"id": nid, "contact_id": contact, "company_id": contacts[contact]["company_id"], "deal_id": deal,
                    "property_id": prop, "summary": summary, "discussed": discussed, "next_steps": [],
-                   "stated_time_text": None, "stated_time": None, "stated_time_note": None,
+                   "stated_time_text": None, "stated_time": None, "stated_time_note": None, "stated_time_warning": None,
                    "recorded_at": _stamp(today - timedelta(days=ago)), "logged_by": names[author]}
              for nid, contact, deal, prop, ago, author, summary, discussed in NOTES}
     tasks = {tid: {"id": tid, "title": title, "contact_id": contact, "deal_id": deal, "status": "open",
-                   "due_text": None, "due": (today + timedelta(days=due)).isoformat(), "due_note": None,
+                   "due_text": None, "due": (today + timedelta(days=due)).isoformat(), "due_note": None, "due_warning": None,
                    "recorded_at": _stamp(today - timedelta(days=7)), "logged_by": names[author]}
              for tid, title, contact, deal, due, author in TASKS}
     events = {eid: {"id": eid, "title": title, "start": datetime.combine(today + timedelta(days=days), start).isoformat(

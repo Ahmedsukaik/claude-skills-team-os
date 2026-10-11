@@ -504,3 +504,6 @@ body.in-story .send:not(:disabled) { background: var(--color-surface-muted); col
 @media (min-width: 901px) {
   body[data-step="2"] .composer, body[data-step="2"] .fiction-note { display: none; }   /* room for the read back card */
 }
+@media (max-width: 900px) {
+  .bot > .rb, .bot > .event { grid-column: 1 / -1; }   /* full width on a phone: the card needs the room */
+}

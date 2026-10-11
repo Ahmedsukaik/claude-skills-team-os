@@ -233,11 +233,13 @@ def test_a_slow_model_call_does_not_block_other_visitors():
         session = httpx.post(base + "/api/new").json()["session"]
         worker = threading.Thread(target=lambda: httpx.post(base + "/api/step", timeout=10, json={
             "session": session, "action": {"type": "broker", "text": "Hello"}, "live": True}))
-        worker.start()
-        time.sleep(0.3)
-        started = time.monotonic()
-        assert httpx.get(base + "/healthz").status_code == 200
-        assert time.monotonic() - started < 1.2
+        with httpx.Client(base_url=base) as other:  # made before timing: creating a client is slow on Windows
+            assert other.get("/healthz").status_code == 200
+            worker.start()
+            time.sleep(0.3)
+            started = time.monotonic()
+            assert other.get("/healthz").status_code == 200
+            assert time.monotonic() - started < 1.2  # blocked, it would wait for the model (about 2.2 s)
         worker.join()
     finally:
         server.should_exit = True

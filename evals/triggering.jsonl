@@ -1,0 +1,41 @@
+{"id": "debrief-tour", "skill": "voice-note-debrief", "say": "Voice note after the tour. Walked 310 Canal Street with Marcus Bell from Tessarine Biotech yesterday afternoon. He liked the loading dock. Follow up with Marcus next week."}
+{"id": "debrief-just-left", "skill": "voice-note-debrief", "say": "Just left the coffee with Hana Sato. She wants to push the lease start back a month."}
+{"id": "debrief-call", "skill": "voice-note-debrief", "say": "Debrief: call with Ravi Menon this morning, he approved the build out budget for 75 Mill Pond Drive. Next steps: send him the contractor list."}
+{"id": "debrief-two-people", "skill": "voice-note-debrief", "say": "Toured 14 Elm Street with Dana Whitlock and Owen Prescott today. Dana counted 28 dock doors and needs 30. I need to send her the expansion plan."}
+{"id": "debrief-met-with", "skill": "voice-note-debrief", "say": "Met with Theo Ashby from Kilnworth Brewing at the Elm St warehouse. He's still interested but wants to wait until spring."}
+{"id": "debrief-spoke-with", "skill": "voice-note-debrief", "say": "Spoke with Lucia Ferrante about the Harbor Road space. She asked for the floor loading numbers."}
+{"id": "debrief-notes-from", "skill": "voice-note-debrief", "say": "Notes from my call with Gil Navarro: Pellucid needs 20 more desks. Follow up on October 30, 2026."}
+{"id": "update-stage-ambiguous", "skill": "crm-update", "say": "Update Dana's deal to LOI signed."}
+{"id": "update-stage-company", "skill": "crm-update", "say": "Move the Pellucid deal to Closed won."}
+{"id": "update-add-contact", "skill": "crm-update", "say": "Add a new contact: Nora Quist, nora.quist@example.com, at Kilnworth Brewing."}
+{"id": "update-email", "skill": "crm-update", "say": "Change Hana Sato's email to hana.sato@pellucid.example.com."}
+{"id": "update-title", "skill": "crm-update", "say": "Please update Gil Navarro's job title to Office Director."}
+{"id": "update-add-company", "skill": "crm-update", "say": "Add a company called Fernway Pharmacy."}
+{"id": "update-stage-mark", "skill": "crm-update", "say": "Mark Bramblecote Foods at 220 Harbor Road as Lease negotiation."}
+{"id": "prep-tomorrow", "skill": "meeting-prep", "say": "Prep me for tomorrow's tour with Dana Whitlock."}
+{"id": "prep-brief-me", "skill": "meeting-prep", "say": "Brief me before my call with Marcus Bell."}
+{"id": "prep-get-ready", "skill": "meeting-prep", "say": "Get me ready for the lease review with Hana Sato."}
+{"id": "prep-site-visit", "skill": "meeting-prep", "say": "What should I know before the Harbor Road site visit?"}
+{"id": "prep-company", "skill": "meeting-prep", "say": "Prepare me for this week's call with Tessarine."}
+{"id": "email-follow-up", "skill": "follow-up-email", "say": "Draft a follow up email to Ravi Menon."}
+{"id": "email-thank-you", "skill": "follow-up-email", "say": "Write a thank you email to Marcus Bell for the tour."}
+{"id": "email-recap", "skill": "follow-up-email", "say": "Email Dana Okafor a recap of the Harbor Road proposal."}
+{"id": "email-question", "skill": "follow-up-email", "say": "Can you draft an email to Hana Sato about the lease timeline?"}
+{"id": "email-send", "skill": "follow-up-email", "say": "Send Theo Ashby a quick email checking in."}
+{"id": "pipeline-weekly", "skill": "weekly-pipeline", "say": "Give me the weekly pipeline summary."}
+{"id": "pipeline-stale", "skill": "weekly-pipeline", "say": "Which deals are stale?"}
+{"id": "pipeline-our", "skill": "weekly-pipeline", "say": "How does our pipeline look this week?"}
+{"id": "pipeline-by-stage", "skill": "weekly-pipeline", "say": "Show me open deals by stage."}
+{"id": "pipeline-mine", "skill": "weekly-pipeline", "say": "What's in my pipeline?"}
+{"id": "rules-times", "skill": "house-rules", "say": "How should we log times in the CRM?"}
+{"id": "rules-saving", "skill": "house-rules", "say": "What are our house rules for saving changes?"}
+{"id": "none-lunch", "skill": null, "near_miss": true, "say": "What's a good lunch spot near the Elm St warehouse?"}
+{"id": "none-article", "skill": null, "near_miss": true, "say": "Summarise this article: office vacancy rates rose in the third quarter as tenants kept shrinking their footprints."}
+{"id": "none-voice-note-tips", "skill": null, "near_miss": true, "say": "Any tips for recording a good voice note on my phone?"}
+{"id": "none-loi-meaning", "skill": null, "near_miss": true, "say": "What does LOI mean in commercial leasing?"}
+{"id": "none-pipeline-meaning", "skill": null, "near_miss": true, "say": "What is a sales pipeline?"}
+{"id": "none-email-poem", "skill": null, "near_miss": true, "say": "Write me a short poem about email."}
+{"id": "none-job-interview", "skill": null, "near_miss": true, "say": "How do I prepare for a job interview?"}
+{"id": "none-walk", "skill": null, "near_miss": true, "say": "Is Market Square nicer than Canal Street for a walk?"}
+{"id": "none-translate", "skill": null, "near_miss": true, "say": "Translate 'thank you for the tour' into Spanish."}
+{"id": "none-weather", "skill": null, "near_miss": true, "say": "What's the weather like for tomorrow's tour?"}

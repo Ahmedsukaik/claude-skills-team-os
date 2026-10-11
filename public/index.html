@@ -7,10 +7,12 @@
 <meta name="description" content="Claude skills that run a brokerage team's CRM work, with a read back and a confirm before every write. A short demo on a fictional brokerage.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="style.css">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232b59c3'/%3E%3Cpath d='M9 24V11l7-4 7 4v13' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linejoin='round'/%3E%3Cpath d='M13 24v-5h6v5' fill='none' stroke='%23fff' stroke-width='2.4'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect x='1' y='1' width='34' height='34' rx='4' fill='%230f2240'/%3E%3Cpath d='M9 27V13l9-5 9 5v14M14 27v-6h8v6M9 18h18' fill='none' stroke='%23f4f7fb' stroke-width='2'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#f4f7fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1628" media="(prefers-color-scheme: dark)">
 </head>
 <body class="app-body in-story" data-step="0" data-pane="broker" data-focus="broker">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -36,13 +38,15 @@
   <symbol id="code" viewBox="0 0 24 24"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></symbol>
   <symbol id="cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9.5 9.5h5v5h-5zM9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/></symbol>
   <symbol id="list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+  <symbol id="skill" viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9"/><path d="M4 6h4M6 4v4"/></symbol>
+  <symbol id="arrow-right" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></symbol>
   <symbol id="flask" viewBox="0 0 24 24"><path d="M9 3h6"/><path d="M10 3v6.2L4.9 18a2 2 0 0 0 1.7 3h10.8a2 2 0 0 0 1.7-3L14 9.2V3"/><path d="M7.3 15h9.4"/></symbol>
 </svg>
 
 <div class="app">
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true"><svg class="i"><use href="#building"/></svg></span>
+      <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true" focusable="false"><rect x="1" y="1" width="34" height="34" rx="4"/><path d="M9 27V13l9-5 9 5v14M14 27v-6h8v6M9 18h18"/></svg>
       <div class="brand-text">
         <h1 class="brand-name">Claude Skills Team OS</h1>
         <div class="brand-sub">Claude for a brokerage team · fictional demo</div>
@@ -94,10 +98,11 @@
 
     <section class="crm-pane" aria-label="The CRM">
       <div class="crm-head">
-        <div class="pane-eyebrow"><svg class="i" aria-hidden="true"><use href="#database"/></svg>The CRM (system of record)</div>
+        <div class="pane-eyebrow"><svg class="i" aria-hidden="true"><use href="#database"/></svg>The CRM · system of record</div>
         <h2 class="crm-title">CRM</h2>
         <p class="crm-desc">Nothing is written until the broker confirms. Every read and write is logged with the CRM's own clock.</p>
         <p class="cost-line" id="cost-line" hidden></p>
+        <div class="pipe-wrap" id="pipeline"></div>
       </div>
       <div class="panel" id="panel" tabindex="-1"></div>
     </section>

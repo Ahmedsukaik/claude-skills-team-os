@@ -30,6 +30,18 @@
     if (list) html += "</ul>";
     return html.replace(/(<br>)+$/, "").replace(/<br>(<ul>)/g, "$1");
   }
+  // Motion that plays once per thing (a card rising in, a stamp landing). The page re-renders
+  // often, so an element rebuilt mid-animation carries on from where it was (a negative delay)
+  // instead of starting over; after `ms` it is plain. Nothing plays for what was already on the
+  // page when it loaded. prefers-reduced-motion turns it all off in style.css.
+  const born = new Map();
+  let motionReady = false;
+  function anim(key, ms = 1400, onLoad = false) {
+    const now = performance.now();
+    if (!born.has(key)) born.set(key, motionReady || onLoad ? now : -Infinity);
+    const age = now - born.get(key);
+    return age < ms ? { cls: " anim", style: ` style="--age:-${Math.round(age)}ms"` } : { cls: "", style: "" };
+  }
   const money = (n) => "$" + Number(n || 0).toFixed(4);
   const isPhone = () => window.matchMedia("(max-width: 900px)").matches;
   // One time format everywhere: the CRM's clock in the visitor's own time zone, 12 hour, no seconds.
@@ -119,7 +131,9 @@
   // ------------------------------------------------------------------ the story
   const STEPS = 6;
   const bars = (n) => `<span class="story-bars" aria-hidden="true">${Array.from({ length: STEPS }, (_, i) => `<i class="${i < n ? "on" : ""}"></i>`).join("")}</span>`;
-  const head = (n, title) => `<div class="story-kicker">${bars(n)}Step ${n} of ${STEPS}</div><h2 class="story-title" id="story-title">${esc(title)}</h2>`;
+  // Each step is a sheet of the drawing set: "SHEET 2 OF 6 · YOUR TURN".
+  const SHEET = { 1: "Voice note", 2: "Your turn", 3: "Saved", 4: "The gate", 5: "Two Danas", 6: "No skill" };
+  const head = (n, title, sheet) => `<div class="story-kicker">${bars(n)}<span>Sheet ${n} of ${STEPS} · ${esc(sheet || SHEET[n])}</span></div><h2 class="story-title" id="story-title">${esc(title)}</h2>`;
   const pending = () => S.view?.pending || [];
   const replies = () => (S.view?.transcript || []).filter((t) => t.kind === "assistant");
   const lastReply = () => replies().pop();
@@ -131,12 +145,18 @@
     const waitLine = S.busy && S.wait ? `<p class="story-wait"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>${esc(S.wait)}</p>` : "";
     switch (S.step) {
       case 0: return {
-        main: `<span class="pill pill-demo pill-plain">Live demo on a made up brokerage</span>
-          <h2 class="story-headline" id="story-title">Your brokers talk. Claude updates the CRM. Nothing saves without their yes.</h2>
-          <p class="story-sub">Follow one broker's voice note into the CRM. You confirm it, then try to break the rules. About two minutes.</p>
-          <ul class="hero-points"><li>${icon("check")}Voice note in, CRM note and tasks out</li><li>${icon("check")}A read back before every write</li><li>${icon("check")}Times are never guessed</li></ul>`,
-        actions: `<button type="button" class="btn btn-primary" data-go="start">Start the demo</button>
-          <button type="button" class="btn-link" data-go="free">Skip to free chat</button>`, focus: "broker" };
+        main: `<div class="hero">
+          <div class="hero-copy">
+            <span class="kicker"><i aria-hidden="true"></i>Sheet A-101 · Live demo</span>
+            <h2 class="story-headline" id="story-title">Your brokers talk. <br>Claude updates the CRM. <br><span>Nothing saves without their yes.</span></h2>
+            <p class="story-sub">Follow one voice note from a property tour into the CRM. You confirm it, then try to break the rules. About two minutes.</p>
+            <div class="hero-actions"><button type="button" class="btn btn-primary btn-lg" data-go="start">Start the demo${icon("arrow-right")}</button>
+              <button type="button" class="btn-link" data-go="free">Skip to free chat</button></div>
+            <ol class="hero-points"><li><span>01</span>Voice note in, CRM note and tasks out</li><li><span>02</span>A read back before every write</li><li><span>03</span>Times are never guessed</li></ol>
+          </div>
+          ${heroFigure()}
+        </div>`,
+        actions: "", focus: "broker" };
       case 1: {
         const answered = replies().length > 0;
         const noCard = answered && !S.busy && !pending().length;
@@ -211,7 +231,7 @@
             <div><span>1,000 chats like it</span><strong>$${(m.cost_usd * 1000).toFixed(2)}</strong></div></div>`
           : `<p class="story-text">Fixed rules answered, so this chat cost nothing. Cost shows when the live AI answers.</p>`;
         return {
-          main: head(6, "What you just saw, and what it costs.") + figures + `<ul class="story-list">
+          main: head(6, "What you just saw, and what it costs.", "Summary") + figures + `<ul class="story-list">
             <li>${ok(lunchClean && skillsFired)}<span>The right skill loaded for each request, none for lunch</span></li>
             <li>${ok(!st.savedNow)}<span>Nothing reached the CRM until you pressed Confirm</span></li>
             <li>${ok(st.testRefused)}<span>A save without your confirm was refused by the CRM's code</span></li>
@@ -230,6 +250,54 @@
           actions: "", focus: "both" };
       }
     }
+  }
+  // The first screen's drawing: the floor plan of the toured building, amber callouts for what the
+  // client liked and what worried him, the voice note, and the title block still waiting for a yes.
+  function heroFigure() {
+    const a = anim("hero", 2600, true);
+    const label = (x, y, long, short, sx = x, sy = y) => `<text class="fp-label fp-long" x="${x}" y="${y}">${long}</text><text class="fp-label fp-short" x="${sx}" y="${sy}">${short}</text>`;
+    return `<div class="hero-side">
+      <figure class="hero-fig${a.cls}"${a.style} aria-label="An example: ${esc(brokerFirst())}'s voice note about a tour of 310 Canal Street, waiting for her yes">
+        <div class="fig-bar"><span>310 Canal Street · Lab building · Tour</span><span>Scale 1:200</span></div>
+        <div class="fig-plan">
+          <svg class="plan" viewBox="0 0 560 280" aria-hidden="true" focusable="false">
+            <g transform="translate(0 20)">
+              <g class="fp-wall">
+                <rect x="20" y="20" width="520" height="210"/>
+                <path d="M200 20v130M200 180v50M360 20v90M360 140v90M200 110h160M20 150h180"/>
+                <path class="fp-door" d="M200 150a30 30 0 0 1 30 30M360 110a30 30 0 0 0 -30 30"/>
+                <rect class="fp-dock" x="420" y="200" width="90" height="30"/>
+              </g>
+              <g class="fp-faint">
+                <path d="M44 44h120M44 60h120M44 76h120M44 92h120"/>
+                <circle cx="460" cy="60" r="22"/><path d="M448 60h24M460 48v24"/>
+              </g>
+              ${label(44, 122, "LAB BENCHES", "LAB", 44, 128)}
+              ${label(228, 62, "OPEN OFFICE", "OFFICE", 222, 72)}
+              ${label(396, 100, "HVAC PLANT", "HVAC", 392, 108)}
+              ${label(424, 194, "LOADING DOCK", "DOCK", 432, 192)}
+              ${label(44, 198, "COLD STORE", "COLD", 44, 204)}
+            </g>
+            <g class="fp-callouts">
+              <path class="fp-lead" pathLength="1" d="M110 80V28"/>
+              <path class="fp-lead" pathLength="1" d="M465 236V262" style="--d:160ms"/>
+              <path class="fp-lead" pathLength="1" d="M470 80L500 30" style="--d:320ms"/>
+              <circle class="fp-dot" cx="110" cy="80" r="3.5"/><circle class="fp-dot" cx="465" cy="236" r="3.5"/><circle class="fp-dot" cx="470" cy="80" r="3.5"/>
+              <text class="fp-tag" x="118" y="24">LIKED</text>
+              <text class="fp-tag" x="473" y="274">LIKED</text>
+              <text class="fp-tag" x="552" y="24" text-anchor="end">WORRIED</text>
+            </g>
+          </svg>
+          <blockquote class="fig-quote"><span>Voice note · ${esc(brokerName())}</span>"Walked 310 Canal Street with Marcus Bell from Tessarine Biotech yesterday afternoon. He liked the lab benches and the loading dock, but he's worried the HVAC can't handle their freezers."</blockquote>
+        </div>
+        <div class="tb tb-4">
+          <div class="tb-cell"><span class="tb-k">Contact</span><b>Marcus Bell</b></div>
+          <div class="tb-cell"><span class="tb-k">When it happened</span><b>"yesterday afternoon"</b></div>
+          <div class="tb-cell"><span class="tb-k">Recorded at</span><b>CRM clock, on yes</b></div>
+          <div class="tb-cell tb-wait"><span class="tb-k">Approved by</span><b>Waiting for ${esc(brokerFirst())}</b></div>
+        </div>
+      </figure>
+      <p class="fig-note">Marrowby Commercial is fictional. Every name, deal and email is made up.</p></div>`;
   }
   function renderStory() {
     const c = storyContent();
@@ -259,7 +327,7 @@
       const primary = $("#story-actions .btn-primary");
       if (primary && n !== 0 && S.keyboard) primary.focus({ preventScroll: true });  // keyboard users keep their place; no ring for clicks
       if (n === 2) showCard(true);
-      if (n === 3) showSaved();
+      if (n === 3) { showSaved(); if (!isPhone()) requestAnimationFrame(() => { const box = $("#thread"); box.scrollTop = box.scrollHeight; }); }
     }
   }
   // Step 2: the badge, the card's header and its Confirm button all in view, above the phone sheet.
@@ -356,12 +424,13 @@
       const tasks = loaded.filter((s) => s !== "house-rules");
       const names = (tasks.length ? tasks : loaded).map(label);
       const withRules = tasks.length && loaded.includes("house-rules");
-      return `<span class="skill">${icon("book")}<span>${names.length > 1 ? "Skills" : "Skill"} used: <b>${esc(names.join(", "))}</b>${withRules ? `<span class="skill-extra"> + House rules</span>` : ""}</span></span>`;
+      return `<span class="skill">${icon("skill")}<span>${names.length > 1 ? "Skills" : "Skill"} used: <b>${esc(names.join(", "))}</b>${withRules ? `<span class="skill-extra"> + House rules</span>` : ""}</span></span>`;
     }
-    if ((it.skills_earlier || []).length) return `<span class="skill none">${icon("book")}<span>Using a skill loaded earlier</span></span>`;
-    return `<span class="skill none">${icon("book")}<span>No skill used</span></span>`;
+    if ((it.skills_earlier || []).length) return `<span class="skill none">${icon("skill")}<span>Using a skill loaded earlier</span></span>`;
+    return `<span class="skill none">${icon("skill")}<span>No skill used</span></span>`;
   }
-  // The time the broker stated, beside the CRM's clock. A date with a warning is still a date.
+  // The title block: the bottom strip of a drawing. The time the broker stated (amber when it is
+  // kept as words), the CRM's clock, and who approved it. A date with a warning is still a date.
   function statedBox(t) {
     if (!t || !t.text) return `<div class="time-box"><span>${esc(t ? t.label : "Stated time")}</span><b>None given</b><small>Left empty, not guessed</small></div>`;
     const exact = !!t.nice && !t.note;
@@ -376,14 +445,20 @@
     if (t.nice && !t.note) return `<span class="due ${t.warning ? "flagged" : "exact"}">Due ${esc(t.nice)}</span>`;
     return `<span class="due flagged">"${esc(t.text)}": kept as words</span>`;
   }
+  // A stamp lands on what was decided: navy ink for a save, red ink for a refusal.
+  const stamp = (kind, text, key) => {
+    const a = anim(key, 1100);
+    return `<span class="stamp stamp-${kind}${a.cls}"${a.style}>${text}</span>`;
+  };
   function readback(card, ring, quiet) {
     const tasks = card.items.filter((it) => it.op === "create_task");
     const others = card.items.filter((it) => it.op !== "create_task");
-    let body = others.map((it) => `<div class="rb-item"><div class="rb-kind">${icon(it.op === "create_note" ? "doc" : "database")}${esc(it.heading)}</div>
+    const main = others.map((it) => `<div class="rb-item"><div class="rb-kind">${esc(it.heading)}</div>
         <dl class="rows">${it.rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
         ${it.lists.map(([k, vals]) => `<div class="rb-list"><b>${esc(k)}</b><ul>${vals.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`).join("")}</div>`).join("");
+    let side = "";
     if (tasks.length) {
-      body += `<div class="rb-item"><div class="rb-kind">${icon("task")}${tasks.length === 1 ? "Task" : `Tasks (${tasks.length})`}</div>
+      side += `<div class="rb-item"><div class="rb-kind">${tasks.length === 1 ? "Task" : `Tasks (${tasks.length})`}</div>
         <ul class="rb-tasks">${tasks.map((t) => {
           const rows = Object.fromEntries(t.rows);
           return `<li><div class="rb-task-head"><span>${esc(rows.Task)}</span>${dueChip(t.time)}</div>
@@ -391,24 +466,33 @@
         }).join("")}</ul></div>`;
     }
     if ((card.flags || []).length) {
-      body += `<div class="rb-item rb-flags"><div class="rb-kind">${icon("alert")}To check</div><ul>${card.flags.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></div>`;
+      side += `<div class="rb-item rb-flags"><div class="rb-kind">${icon("alert")}To check</div><ul>${card.flags.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></div>`;
     }
+    const body = main && side ? `<div class="rb-col">${main}</div><div class="rb-col rb-side">${side}</div>` : `<div class="rb-col">${main || side}</div>`;
     const stated = others.filter((it) => it.time).map((it) => statedBox(it.time)).join("");
     const status = card.status;
+    const n = card.items.length;
+    const kicker = { pending: "What will be saved", committed: "Saved to the CRM", expired: "Expired, nothing saved", discarded: "Discarded, nothing saved" }[status] || "What will be saved";
     const pill = status === "pending" ? `<span class="pill pill-pending"><span class="pill-long">Waiting for your confirm</span><span class="pill-short">Not saved yet</span></span>`
-      : status === "committed" ? `<span class="pill pill-saved">Saved</span>`
-      : `<span class="pill pill-quiet">${status === "expired" ? "Expired" : "Discarded"}</span>`;
-    const times = `<div class="times">${stated || ""}${systemBox(status === "committed" ? card.committed_at : null, card.proposed_at)}</div>`;
+      : status === "committed" ? "" : `<span class="pill pill-quiet">${status === "expired" ? "Expired" : "Discarded"}</span>`;
     const ids = `data-hash="${esc(card.hash)}"`;
-    const foot = status === "pending"
-      ? `${times}<div class="rb-actions"><span class="rb-note">Nothing is saved until you confirm.</span><button type="button" class="btn btn-secondary" data-discard="${esc(card.id)}" ${ids}>Discard</button>
-         <button type="button" class="btn ${quiet ? "btn-secondary" : "btn-primary"}${ring ? " ring" : ""}" data-confirm="${esc(card.id)}" ${ids}>${icon("check")}Confirm and save</button></div>`
-      : status === "committed"
-        ? `${times}<div class="rb-done">${icon("check-circle")}<span><b>Saved by ${esc(brokerName())}</b> with the Confirm button.</span></div>`
-        : `<div class="rb-done off">${icon("x-circle")}<span>${status === "expired" ? "Expired after 30 minutes. Nothing was saved." : "Discarded. Nothing was saved."}</span></div>`;
-    return `<article class="rb${status === "committed" ? " is-saved" : status === "pending" ? "" : " is-off"}${ring ? " ring-card" : ""}" aria-label="Read back: ${esc(card.summary)}">
-      <div class="rb-head"><div class="rb-title">${icon("doc")}What will be saved</div>${pill}</div>
-      <div class="rb-body">${body}</div><div class="rb-foot">${foot}</div></article>`;
+    let foot;
+    if (status === "pending") {
+      foot = `<div class="times">${stated}${systemBox(null, card.proposed_at)}
+        <div class="tb-cell tb-approve"><span>Approved by</span><div class="rb-actions">
+          <button type="button" class="btn ${quiet ? "btn-secondary" : "btn-primary"}${ring ? " ring" : ""}" data-confirm="${esc(card.id)}" ${ids}>${icon("check")}Confirm and save</button>
+          <button type="button" class="btn btn-secondary" data-discard="${esc(card.id)}" ${ids}>Discard</button></div></div></div>`;
+    } else if (status === "committed") {
+      foot = `<div class="times">${stated}${systemBox(card.committed_at)}
+        <div class="tb-cell tb-approve is-signed"><span>Approved by</span><b>${esc(brokerName())}</b><small>With the Confirm button</small>
+          ${stamp("saved", `Saved · ${esc(clock(card.committed_at))}`, "saved:" + card.id)}</div></div>`;
+    } else {
+      foot = `<div class="rb-done off">${icon("x-circle")}<span>${status === "expired" ? "Expired after 30 minutes. Nothing was saved." : "Discarded. Nothing was saved."}</span></div>`;
+    }
+    const a = anim("rb:" + card.id, 700);
+    return `<article class="rb${status === "committed" ? " is-saved" : status === "pending" ? "" : " is-off"}${ring ? " ring-card" : ""}${a.cls}"${a.style} aria-label="Read back: ${esc(card.summary)}">
+      <div class="rb-head"><div class="rb-headline"><span class="rb-kicker">${kicker}<span class="rb-count"> · ${n} record${n === 1 ? "" : "s"}</span></span><span class="rb-sum">${esc(card.summary)}</span></div>${pill}</div>
+      <div class="rb-body${main && side ? " two" : ""}">${body}</div><div class="rb-foot">${foot}</div></article>`;
   }
   function renderChat() {
     const box = $("#thread");
@@ -436,8 +520,10 @@
       } else if (it.kind === "notice") {
         html += `<div class="sys-line ${it.notice === "saved" ? "saved" : ""}">${icon(it.notice === "saved" ? "check-circle" : "x-circle", "i i-sm")}${esc(it.text)}</div>`;
       } else if (it.kind === "test") {
-        html += `<div class="event">${icon("shield")}<div class="event-head"><span>${esc(it.text)}</span><span class="pill ${it.refused ? "pill-refused" : "pill-saved"}">${it.refused ? "Refused" : "Saved"}</span></div>
-          <div class="event-body">${it.refused ? "The CRM's code said: " : ""}${esc(it.result)}</div></div>`;
+        const a = anim("test:" + it.at + it.write_id, 700);
+        html += `<div class="event${it.refused ? "" : " let-through"}${a.cls}"${a.style}>${icon("shield")}<div class="event-text"><div class="event-head">${esc(it.text)}</div>
+          <div class="event-body">${it.refused ? "The CRM's code said: " : ""}${esc(it.result)}</div></div>
+          ${stamp(it.refused ? "refused" : "saved", it.refused ? "Refused" : "Saved", "stamp:" + it.at + it.write_id)}</div>`;
       } else if (it.kind === "system") {
         html += `<div class="sys-line">${icon("alert", "i i-sm")}${esc(it.text)}</div>`;
       } else if (it.kind === "working") {
@@ -500,13 +586,42 @@
     const kinds = {};
     records.forEach((r) => { kinds[r.kind] = (kinds[r.kind] || 0) + 1; });
     const what = Object.entries(kinds).map(([k, n]) => count(n, k)).join(" and ");
-    const rows = records.map((r) => `<li><span class="tile sm">${icon(r.kind === "task" ? "task" : r.kind === "note" ? "doc" : "database")}</span>
-      <div><div class="saved-title">${esc(r.title)}</div><small>${r.kind === "note" ? "Note" : r.kind === "task" ? "Task" : esc(r.kind[0].toUpperCase() + r.kind.slice(1))}${r.contact ? " · " + esc(r.contact) : ""}</small></div>
+    const a = anim("rec:" + first.write_id, 1200);
+    const rows = records.map((r, i) => `<li style="--i:${i}"><span class="saved-kind">${r.kind === "note" ? "Note" : r.kind === "task" ? "Task" : esc(r.kind[0].toUpperCase() + r.kind.slice(1))}</span>
+      <div><div class="saved-title">${esc(r.title)}</div>${r.contact ? `<small>${esc(r.contact)}</small>` : ""}</div>
       ${r.kind === "task" ? dueChip(r.time) : ""}</li>`).join("");
-    return `<article class="card rec${ring ? " ring-card" : ""}"><div class="rec-head"><span class="tile">${icon("database")}</span>
-      <div><div class="rec-title">Saved ${esc(what)}</div><div class="rec-sub">${esc((note || first).title)}</div></div><span class="pill pill-saved">Saved</span></div>
+    return `<article class="card rec is-saved${ring ? " ring-card" : ""}${a.cls}"${a.style}><div class="rec-head">
+      <div><div class="rec-title">Saved ${esc(what)}</div><div class="rec-sub">${esc((note || first).title)}</div></div>${stamp("saved", `Saved · ${esc(clock(first.recorded_at))}`, "recstamp:" + first.write_id)}</div>
       <div class="times">${systemBox(first.recorded_at)}${note && note.time ? statedBox(note.time) : ""}</div>
       <ul class="saved-list">${rows}</ul></article>`;
+  }
+  // The pipeline strip: open deals by stage, from this chat's copy of the CRM. The deal the
+  // newest card touches is marked; a stage move waiting for a confirm marks where it would go.
+  function pipeline(v) {
+    const stages = (S.config?.stages || []).filter((x) => !x.startsWith("Closed"));
+    if (!stages.length) return "";
+    const SHORT = { "Proposal sent": "Proposal", "LOI signed": "LOI", "Lease negotiation": "Negotiation" };
+    const cards = [...(v.pending || [])];
+    if (!cards.length) {
+      const done = (v.transcript || []).flatMap((t) => t.cards || []).filter((c) => c.status === "committed");
+      if (done.length) cards.push(done[done.length - 1]);
+    }
+    const card = cards[cards.length - 1];
+    const touched = new Set(), moving = new Set();
+    for (const c of card ? card.changes || [] : []) {
+      if (c.deal_id) touched.add(c.deal_id);
+      if (c.op === "update_deal_stage" && card.status === "pending") moving.add(c.stage);
+    }
+    const deals = v.deals || [];
+    const here = new Set(deals.filter((d) => touched.has(d.id)).map((d) => d.stage));
+    const open = deals.filter((d) => stages.includes(d.stage)).length;
+    const cells = stages.map((st) => {
+      const n = deals.filter((d) => d.stage === st).length;
+      const cls = here.has(st) ? " here" : moving.has(st) ? " moving" : "";
+      const mark = here.has(st) ? `<em>This card</em>` : moving.has(st) ? `<em>Waiting</em>` : "";
+      return `<li class="pipe-cell${cls}" title="${esc(st)}"><span class="pipe-k">${esc(SHORT[st] || st)}</span><b>${n}</b>${mark}<span class="sr-only"> ${esc(st)}: ${n} deal${n === 1 ? "" : "s"}${mark ? ", the deal on the newest card" : ""}</span></li>`;
+    }).join("");
+    return `<div class="pipe-head"><span>Pipeline · open deals</span><span>${open} open</span></div><ol class="pipe" aria-label="Open deals by stage">${cells}</ol>`;
   }
   function renderCRM() {
     const v = S.view || { pending: [], saved: [], drafts: [], log: [], metrics: {}, deals: [] };
@@ -515,9 +630,10 @@
     const cost = $("#cost-line");
     cost.hidden = !m.live_calls;
     cost.innerHTML = m.live_calls ? `${icon("cpu", "i i-sm")}AI cost of this chat: <strong>${money(m.cost_usd)}</strong>` : "";
+    $("#pipeline").innerHTML = pipeline(v);
     let html = "";
     if (v.pending.length) {
-      html += `<div class="group-label">Waiting for a confirm</div>` + v.pending.map((c) => `<article class="card rec"><div class="rec-head"><span class="tile">${icon("clock")}</span>
+      html += `<div class="group-label">Waiting for a confirm</div>` + v.pending.map((c) => `<article class="card rec is-waiting"><div class="rec-head">
         <div><div class="rec-title">${esc(c.summary)}</div><div class="rec-sub">${c.items.length} record${c.items.length === 1 ? "" : "s"} · confirm it on the card in the chat</div></div>
         <span class="pill pill-pending">Not saved</span></div></article>`).join("");
     }
@@ -527,14 +643,14 @@
       html += `<div class="group-label">Saved in this demo</div>` + writes.map((w, i) => savedCard(v.saved.filter((r) => r.write_id === w), S.step === 3 && i === 0)).join("");
     }
     if (v.drafts.length) {
-      html += `<div class="group-label">Email drafts (never sent)</div>` + v.drafts.map((d) => `<article class="card rec"><div class="rec-head"><span class="tile">${icon("mail")}</span>
+      html += `<div class="group-label">Email drafts (never sent)</div>` + v.drafts.map((d) => `<article class="card rec"><div class="rec-head">
         <div><div class="rec-title">${esc(d.subject)}</div><div class="rec-sub">To ${esc(d.to_name)} · in ${esc(brokerFirst())}'s mailbox</div></div><span class="pill pill-quiet">Draft, not sent</span></div></article>`).join("");
     }
     if (!v.pending.length && !writes.length && !v.drafts.length) {
-      html += `<div class="empty"><span class="tile">${icon("database")}</span><h3>Nothing new yet</h3>
+      html += `<div class="empty"><h3>Nothing new yet</h3>
         <p>When Claude prepares a change, it waits for the broker's confirm. Saved notes and tasks appear here with the CRM's own time.</p></div>`;
     }
-    html += `<details class="card fold" id="activity"${S.logOpen ? " open" : ""}><summary><span class="tile">${icon("list")}</span>
+    html += `<details class="card fold" id="activity"${S.logOpen ? " open" : ""}><summary>
       <div><div class="fold-title">Activity log</div><div class="fold-sub">Every read and write, with the CRM's clock</div></div>${icon("chev-down", "i chev")}</summary>
       ${v.log.length ? logList(v.log, S.logAll) : '<p class="explain" style="padding:0 16px 16px">Every lookup, change, refusal and save appears here.</p>'}</details>`;
     html += hoodCard(v);
@@ -552,7 +668,7 @@
     const deals = (v.deals || []).map((d) => `<tr><td>${esc(d.name)}</td><td>${esc(d.stage)}</td><td>${esc(d.owner)}</td></tr>`).join("");
     const raw = (v.log || []).slice(-40).map((e) => `${e.at}  ${e.actor} | ${e.action} | ${e.ref || "-"} | ${e.outcome}\n  ${e.detail}`).join("\n");
     const model = cfg.model ? prettyModel(cfg.model) : "not configured";
-    return `<details class="card fold" id="hood"${S.hoodOpen ? " open" : ""}><summary><span class="tile">${icon("cpu")}</span>
+    return `<details class="card fold" id="hood"${S.hoodOpen ? " open" : ""}><summary>
       <div><div class="fold-title">Under the hood</div><div class="fold-sub">Who answers, the six skills, usage, the raw log, deals</div></div>${icon("chev-down", "i chev")}</summary>
       <div class="hood-body">
         <div><h4>Who answers</h4><div class="seg" role="group" aria-label="Who answers">
@@ -642,6 +758,7 @@
     }
     if (!S.view) { await newChat(); S.step = 0; }
     render();
+    motionReady = true;
   }
   init();
 })();

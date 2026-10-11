@@ -102,7 +102,7 @@ def run_story(page, check) -> None:
     button(page, "Next: when no skill fits").click()
     check(button(page, "Ask about lunch"))
     button(page, "Ask about lunch").click()
-    page.locator(".story-title", has_text="No skill used.").wait_for()
+    page.locator(".story-title", has_text="What you just saw").wait_for()
     check(button(page, "Try it yourself"))
 
 
@@ -122,25 +122,32 @@ def test_the_story_at_every_size_with_each_action_in_view(browser, site, size):
 
 def test_what_each_step_shows(browser, site):
     context, page, errors = open_page(browser, site)
-    assert "Nothing reaches the CRM without a yes." in page.locator("#story").inner_text()
+    assert "Nothing saves without their yes." in page.locator("#story").inner_text()
     assert page.evaluate("getComputedStyle(document.querySelector('.layout')).pointerEvents") == "none"
     button(page, "Start the demo").click()
     button(page, "Send Priya's voice note").click()
     page.locator(".story-title", has_text="Your turn").wait_for()
     reply = page.locator(".bot").filter(has=page.locator(".skill")).last
-    assert "Skill used: voice-note-debrief" in " ".join(reply.locator(".skill").inner_text().split())
+    assert "Skill used: Voice note debrief" in " ".join(reply.locator(".skill").inner_text().split())
+    assert "voice-note-debrief" not in page.locator("#story").inner_text() + reply.inner_text()  # people names, not code names
     assert "Fixed rules" in reply.locator(".tag").inner_text()
     card = page.locator(".rb").first
     assert '"yesterday afternoon"' in card.inner_text() and "Vague, so no date set" in card.inner_text()
     assert "When you confirm" in card.inner_text() and "Due Fri, Oct" in card.inner_text()
+    assert "For Marcus Bell (Tessarine Biotech)" in card.inner_text() and "Deal: Tessarine Biotech" in card.inner_text()
     page.locator("[data-confirm]").first.click()
     page.locator(".story-title", has_text="Saved").wait_for()
     note = page.locator(".rec", has_text="Tour of 310 Canal Street").first
     assert "Recorded at (CRM clock)" in note.inner_text() and '"yesterday afternoon"' in note.inner_text()
+    assert "Saved one note and three tasks" in note.inner_text() and note.inner_text().count("Recorded at") == 1
+    assert "one note and three tasks" in page.locator("#story").inner_text()
     button(page, "Next: try to skip the gate").click()
     button(page, "Send it").click()
     page.locator(".story-title", has_text="The gate held.").wait_for()
     assert "Saved without your confirm: 0" in page.locator("#story").inner_text()
+    assert "still waits for Priya's confirm" in page.locator("#story").inner_text()
+    gate_confirm = page.locator(".rb", has_text="Ravi").locator("[data-confirm]")
+    assert "btn-secondary" in gate_confirm.get_attribute("class")  # the story is about what does not save
     assert "Refused" in page.locator(".event").inner_text()
     assert "Refused" in page.locator("#activity").inner_text()
     button(page, "Next: two people called Dana").click()
@@ -149,10 +156,12 @@ def test_what_each_step_shows(browser, site):
     assert "Changes prepared: 0" in page.locator("#story").inner_text()
     button(page, "Next: when no skill fits").click()
     button(page, "Ask about lunch").click()
-    page.locator(".story-title", has_text="No skill used").wait_for()
+    page.locator(".story-title", has_text="What you just saw").wait_for()
     assert "No skill used" in page.locator(".bot .skill").last.inner_text()
-    assert "cost nothing" in page.locator("#story").inner_text()
-    assert page.locator(".story-skills li.used").count() == 3
+    story = page.locator("#story").inner_text()
+    assert "What you just saw, and what it costs." in story and "cost nothing" in story and "Cost shows when the live AI" in story
+    assert page.locator("#story .story-list li").count() == 5 and "Your version runs on your CRM" in story
+    assert page.locator("#story .story-list .warn").count() == 0  # every claim held in this run
     button(page, "Try it yourself").click()
     page.locator(".story-title", has_text="Ask what a broker would ask").wait_for()
     assert page.locator(".chip").count() >= 8 and page.locator(".chip-near").count() >= 3
@@ -242,8 +251,70 @@ def test_with_a_live_model_the_reply_is_marked_ai_and_the_crm_shows_the_cost(bro
         page.locator("#input").fill("Give me the weekly pipeline summary.")
         page.locator("#input").press("Enter")
         page.locator(".bot .tag", has_text="AI").wait_for()
-        assert "Skill used: weekly-pipeline" in " ".join(page.locator(".bot .skill").last.inner_text().split())
+        assert "Skill used: Weekly pipeline" in " ".join(page.locator(".bot .skill").last.inner_text().split())
         assert "AI cost of this chat: $0.0" in " ".join(page.locator("#cost-line").inner_text().split())
+        context.close()
+        assert errors == []
+    finally:
+        server.should_exit = True
+
+
+@pytest.mark.parametrize("size", [(390, 664), (360, 640)], ids=["390x664", "360x640"])
+def test_on_a_short_phone_step_two_shows_the_badge_the_card_and_confirm(browser, site, size):
+    context, page, errors = open_page(browser, site, *size)
+    button(page, "Start the demo").click()
+    button(page, "Send Priya's voice note").click()
+    page.locator(".story-title", has_text="Your turn").wait_for()
+    page.wait_for_timeout(200)
+    reply = page.locator(".bot").filter(has=page.locator(".rb")).last
+    thread = page.locator("#thread").bounding_box()
+    for part in (reply.locator(".skill"), reply.locator(".rb-head"), reply.locator("[data-confirm]")):
+        fully_visible(page, part)
+        assert part.bounding_box()["y"] >= thread["y"] - 1  # not scrolled away above the chat
+    assert page.locator(".story-short").is_visible() and not page.locator("#story .story-text").is_visible()
+    context.close()
+    assert errors == []
+
+
+def test_free_chat_on_a_phone_does_not_open_the_keyboard(browser, site):
+    context, page, errors = open_page(browser, site, 390, 844)
+    page.get_by_role("button", name="Skip to free chat").click()
+    page.locator(".chip").first.wait_for()
+    page.wait_for_timeout(200)
+    assert page.evaluate("document.activeElement.id") != "input"
+    context.close()
+    assert errors == []
+
+
+def test_chips_wrap_on_desktop_and_loi_comes_second(browser, site):
+    context, page, errors = open_page(browser, site)
+    page.get_by_role("button", name="Skip to free chat").click()
+    chips = page.locator(".chip")
+    chips.first.wait_for()
+    assert chips.nth(1).inner_text().strip() == "What does LOI mean?"
+    tops = {round(chips.nth(i).bounding_box()["y"]) for i in range(chips.count())}
+    assert len(tops) > 1  # more than one row: the chips wrap
+    assert page.evaluate("(row => row.scrollWidth <= row.clientWidth + 1)(document.querySelector('.suggest'))")
+    context.close()
+    assert errors == []
+
+
+def test_a_badge_with_several_skills_wraps_instead_of_overflowing(browser):
+    live = ScriptedModel([tool(1, "load_skill", name="house-rules"), tool(2, "load_skill", name="voice-note-debrief"),
+                          tool(3, "load_skill", name="meeting-prep"), tool(4, "load_skill", name="weekly-pipeline")],
+                         [text("Done.")])
+    url, server = start_server(Agent(live=live))
+    try:
+        context, page, errors = open_page(browser, url, 360, 640)
+        page.get_by_role("button", name="Skip to free chat").click()
+        page.locator("#input").fill("Prep me and sum up the week.")
+        page.locator("#input").press("Enter")
+        badge = page.locator(".bot .skill").last
+        badge.wait_for()
+        assert "Skills used: Voice note debrief, Meeting prep, Weekly pipeline" in " ".join(badge.inner_text().split())
+        box, head = badge.bounding_box(), page.locator(".bot .bot-head").last.bounding_box()
+        assert box["x"] + box["width"] <= head["x"] + head["width"] + 1 and box["x"] + box["width"] <= 360
+        no_sideways_scroll(page)
         context.close()
         assert errors == []
     finally:

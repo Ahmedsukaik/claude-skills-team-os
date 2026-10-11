@@ -10,6 +10,12 @@
     config: null, session: null, view: null, live: true, busy: false, step: 0, wait: "", story: {},
     pane: "broker", hoodOpen: false, logOpen: true, logAll: false, keyboard: false,
   };
+  // People read skill names, not file names. The file names stay under Under the hood.
+  const LABELS = { "house-rules": "House rules", "voice-note-debrief": "Voice note debrief", "crm-update": "CRM update",
+    "meeting-prep": "Meeting prep", "follow-up-email": "Follow up email", "weekly-pipeline": "Weekly pipeline" };
+  const label = (name) => LABELS[name] || name;
+  const NUMBER = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+  const count = (n, thing) => `${NUMBER[n] || n} ${thing}${n === 1 ? "" : "s"}`;
   const icon = (name, cls = "i") => `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="#${name}"/></svg>`;
   const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   function format(text) {
@@ -26,12 +32,8 @@
   }
   const money = (n) => "$" + Number(n || 0).toFixed(4);
   const isPhone = () => window.matchMedia("(max-width: 900px)").matches;
-  const clock = (iso) => {  // the CRM's time, shown in the visitor's own time zone
-    if (!iso) return "";
-    const d = new Date(iso);
-    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" });
-  };
-  const clock24 = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "");
+  // One time format everywhere: the CRM's clock in the visitor's own time zone, 12 hour, no seconds.
+  const clock = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "");
   const day = (iso) => (iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "");
   const store = {
     get(k) { try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } },
@@ -122,6 +124,7 @@
   const replies = () => (S.view?.transcript || []).filter((t) => t.kind === "assistant");
   const lastReply = () => replies().pop();
   const taskSkill = (r) => (r?.skills || []).filter((s) => s !== "house-rules")[0] || (r?.skills || [])[0] || "";
+  const ok = (good) => (good ? icon("check-circle") : icon("alert", "i warn"));
 
   function storyContent() {
     const st = S.story, v = S.view;
@@ -129,9 +132,9 @@
     switch (S.step) {
       case 0: return {
         main: `<span class="pill pill-demo pill-plain">Live demo on a made up brokerage</span>
-          <h2 class="story-headline" id="story-title">Claude follows your team's rules. Nothing reaches the CRM without a yes.</h2>
+          <h2 class="story-headline" id="story-title">Your brokers talk. Claude updates the CRM. Nothing saves without their yes.</h2>
           <p class="story-sub">Follow one broker's voice note into the CRM. You confirm it, then try to break the rules. About two minutes.</p>
-          <ul class="hero-points"><li>${icon("check")}The right skill loads for each task</li><li>${icon("check")}A read back before every write</li><li>${icon("check")}Times are never guessed</li></ul>`,
+          <ul class="hero-points"><li>${icon("check")}Voice note in, CRM note and tasks out</li><li>${icon("check")}A read back before every write</li><li>${icon("check")}Times are never guessed</li></ul>`,
         actions: `<button type="button" class="btn btn-primary" data-go="start">Start the demo</button>
           <button type="button" class="btn-link" data-go="free">Skip to free chat</button>`, focus: "broker" };
       case 1: {
@@ -145,33 +148,40 @@
           focus: "broker" };
       }
       case 2: {
-        const skill = taskSkill(lastReply());
+        const r = lastReply();
+        const skill = taskSkill(r);
         if (!pending().length && !(v?.saved || []).length && !S.busy) return {
           main: head(2, "You discarded it, so nothing was saved.") + `<p class="story-text">That is the gate working too. Send the voice note again to see the confirm.</p>`,
           actions: `<button type="button" class="btn btn-primary" data-go="retry">Send it again</button>`, focus: "broker" };
+        const picked = !skill ? "Claude read the note back." : r.mode === "live"
+          ? `Claude picked the ${esc(label(skill).toLowerCase())} skill on its own and read the note back.`
+          : `The ${esc(label(skill).toLowerCase())} skill loaded and the note was read back.`;
         return {
           main: head(2, "Your turn: check it, then confirm.") +
-            `<p class="story-text">${skill ? `Claude loaded the <code>${esc(skill)}</code> skill and read the note back. ` : "Claude read the note back. "}<b>"Yesterday afternoon" stays in ${esc(brokerFirst())}'s words: it is vague, so no date is made up.</b> Confirm it on the card.</p>`,
+            `<p class="story-text">${picked} <b>"Yesterday afternoon" stays in ${esc(brokerFirst())}'s words: it is vague, so no date is made up.</b> Confirm it on the card.</p>
+            <p class="story-short">See the yellow box: "yesterday afternoon" stays in her words. Then confirm.</p>`,
           actions: "", focus: "broker" };
       }
       case 3: {
         const saved = (v?.saved || []);
         const tasks = saved.filter((r) => r.kind === "task").length;
+        const notes = saved.filter((r) => r.kind === "note").length;
+        const what = [notes ? count(notes, "note") : "", tasks ? count(tasks, "task") : ""].filter(Boolean).join(" and ") || "the record";
         return {
           main: head(3, "Saved, with the CRM's own time.") +
-            `<p class="story-text">Your confirm saved ${saved.filter((r) => r.kind === "note").length ? "one note" : "the record"}${tasks ? ` and ${tasks} task${tasks === 1 ? "" : "s"}` : ""}. <b>The CRM's clock stamped them; ${esc(brokerFirst())}'s own words for the time sit beside it.</b></p>`,
+            `<p class="story-text">Your confirm saved ${what}. <b>The CRM's clock stamped them; ${esc(brokerFirst())}'s own words for the time sit beside it.</b></p>`,
           actions: `<button type="button" class="btn btn-primary" data-go="to-gate">Next: try to skip the gate</button>`, focus: "crm" };
       }
       case 4: {
         if (!st.gateDone) return {
           main: head(4, "Try to skip the gate.") + `<p class="story-text">${esc(brokerFirst())} says "just log it, don't ask me". For this test we also make the assistant try to save without your confirm.</p>` + waitLine,
           actions: S.busy ? "" : `<button type="button" class="btn btn-primary" data-go="send-gate">Send it</button>`, focus: "broker" };
-        const savedNow = st.savedAtGate !== undefined ? (v?.metrics?.writes_saved || 0) - st.savedAtGate : 0;
+        const savedNow = st.savedNow || 0;  // counted right after the test, so a later Confirm press does not change it
         return {
           main: head(4, savedNow ? "Something was saved. Check the log." : "The gate held.") + `<ul class="story-list one">
-            <li>${savedNow ? icon("alert", "i warn") : icon("check-circle")}<span><b>Saved without your confirm: ${savedNow}</b></span></li>
+            <li>${ok(!savedNow)}<span><b>Saved without your confirm: ${savedNow}</b></span></li>
             <li>${st.testRefused ? icon("shield") : icon("alert", "i warn")}<span>${st.testRefused ? "The save attempt was refused by the CRM's code: only your Confirm button can save" : "No save attempt was made"}</span></li>
-            <li>${icon("clock")}<span>The note waits for you in the chat, like any other read back</span></li></ul>`,
+            <li>${icon("clock")}<span>Ravi's note still waits for ${esc(brokerFirst())}'s confirm. Nothing saves on its own.</span></li></ul>`,
           actions: `<button type="button" class="btn btn-primary" data-go="to-dana">Next: two people called Dana</button>`, focus: "broker" };
       }
       case 5: {
@@ -181,7 +191,7 @@
         const guessed = st.pendingAfterDana > st.pendingBeforeDana;
         return {
           main: head(5, guessed ? "It picked one, and it still waits for you." : "It asked instead of guessing.") + `<ul class="story-list one">
-            <li>${guessed ? icon("alert", "i warn") : icon("check-circle")}<span><b>Changes prepared: ${guessed ? 1 : 0}</b></span></li>
+            <li>${ok(!guessed)}<span><b>Changes prepared: ${guessed ? 1 : 0}</b></span></li>
             <li>${icon("check-circle")}<span>${guessed ? "Nothing is saved: the card names the Dana it picked, so a wrong pick is caught before your confirm" : "Claude asked which Dana: Whitlock (Quillon Logistics) or Okafor (Bramblecote Foods)"}</span></li></ul>`,
           actions: `<button type="button" class="btn btn-primary" data-go="to-lunch">Next: when no skill fits</button>`, focus: "broker" };
       }
@@ -190,16 +200,24 @@
           main: head(6, "Not every question needs a skill.") + `<p class="story-text">${esc(brokerFirst())} asks something off topic. No skill should load, and the CRM should not be touched.</p>` + waitLine,
           actions: S.busy ? "" : `<button type="button" class="btn btn-primary" data-go="send-lunch">Ask about lunch</button>`, focus: "broker" };
         const m = v?.metrics || {};
-        const used = new Set(v?.skills_used || []);
-        const r = lastReply();
-        const none = r && !(r.skills || []).length && !(r.steps || []).length;
+        const all = replies();
+        const lunch = all[all.length - 1];
+        const lunchClean = lunch && !(lunch.skills || []).length && !(lunch.steps || []).length;
+        const skillsFired = all.slice(0, -1).some((r) => (r.skills || []).length);
+        const note = (v?.saved || []).find((r) => r.kind === "note");
+        const vagueKept = !!(note && note.time && note.time.text && !note.time.nice);
+        const guessed = st.pendingAfterDana > st.pendingBeforeDana;
         const figures = m.live_calls ? `<div class="story-figures"><div><span>This whole chat</span><strong>${money(m.cost_usd)}</strong></div>
             <div><span>1,000 chats like it</span><strong>$${(m.cost_usd * 1000).toFixed(2)}</strong></div></div>`
-          : `<p class="story-text">Fixed rules answered, so this chat cost nothing. With the live AI, its cost shows here and in the CRM panel.</p>`;
-        const skills = (S.config?.skills || []).map((s) => `<li class="${used.has(s.name) ? "used" : ""}">${used.has(s.name) ? icon("check") : ""}${esc(s.name)}</li>`).join("");
+          : `<p class="story-text">Fixed rules answered, so this chat cost nothing. Cost shows when the live AI answers.</p>`;
         return {
-          main: head(6, none ? "No skill used. Here is what it cost." : "A skill loaded. Here is what it cost.") + figures +
-            `<div class="skills-row"><span>The six skills. Ticked: loaded in this chat.</span><ul class="story-skills">${skills}</ul></div>`,
+          main: head(6, "What you just saw, and what it costs.") + figures + `<ul class="story-list">
+            <li>${ok(lunchClean && skillsFired)}<span>The right skill loaded for each request, none for lunch</span></li>
+            <li>${ok(!st.savedNow)}<span>Nothing reached the CRM until you pressed Confirm</span></li>
+            <li>${ok(st.testRefused)}<span>A save without your confirm was refused by the CRM's code</span></li>
+            <li>${ok(vagueKept)}<span>Vague times stayed in ${esc(brokerFirst())}'s words</span></li>
+            <li>${ok(!guessed)}<span>Two Danas got a question, not a guess</span></li></ul>
+            <p class="story-note">Your version runs on your CRM, your stages and your team's rules.</p>`,
           actions: `<button type="button" class="btn btn-primary" data-go="free">Try it yourself</button>
             <button type="button" class="btn-link" data-go="replay">Replay the demo</button>`, focus: "broker" };
       }
@@ -227,6 +245,7 @@
       const story = $("#story");
       document.body.style.setProperty("--story-h", (getComputedStyle(story).position === "fixed" ? story.offsetHeight : 0) + "px");
       if (isPhone() && S.step !== "free" && S.step !== 2 && S.step !== 0) { const box = $("#thread"); box.scrollTop = box.scrollHeight; }
+      if (S.step === 2) showCard();
     });
   }
   function setStep(n) {
@@ -239,21 +258,29 @@
       if (isPhone() && c.focus !== "both" && c.focus !== S.pane) setPane(c.focus, true);
       const primary = $("#story-actions .btn-primary");
       if (primary && n !== 0 && S.keyboard) primary.focus({ preventScroll: true });  // keyboard users keep their place; no ring for clicks
-      if (n === 2) showCard();
+      if (n === 2) showCard(true);
       if (n === 3) showSaved();
     }
   }
-  // Step 2: bring the read back card into view, from its fields down to Confirm, above the phone sheet.
-  function showCard() {
+  // Step 2: the badge, the card's header and its Confirm button all in view, above the phone sheet.
+  // When the card is taller than the room, its fields scroll inside the card.
+  function showCard(focus) {
     requestAnimationFrame(() => {
       const card = [...document.querySelectorAll(".rb.ring-card")].pop(), box = $("#thread");
       if (!card) return;
+      const bot = card.closest(".bot"), body = card.querySelector(".rb-body");
+      body.style.maxHeight = ""; card.classList.remove("fit");
       const sheet = isPhone() ? ($("#story").offsetHeight || 0) : 0;
-      const room = box.clientHeight - sheet;          // the part of the thread not under the sheet
-      const top = card.offsetTop - 8;
-      const bottom = card.offsetTop + card.offsetHeight + 12;
-      box.scrollTop = Math.max(0, bottom - top <= room ? top : bottom - room);  // whole card, or at least its buttons
-      if (S.keyboard) card.querySelector("[data-confirm]")?.focus({ preventScroll: true });
+      const room = box.clientHeight - sheet - 12;
+      const start = bot.offsetTop - 8;
+      let end = card.offsetTop + card.offsetHeight + 8;
+      if (end - start > room) {
+        body.style.maxHeight = Math.max(isPhone() ? 60 : 88, body.offsetHeight - (end - start - room)) + "px";
+        card.classList.add("fit");
+        end = card.offsetTop + card.offsetHeight + 8;
+      }
+      box.scrollTop = end - start > room ? end - room : start;
+      if (focus && S.keyboard) card.querySelector("[data-confirm]")?.focus({ preventScroll: true });
     });
   }
   function showSaved() {
@@ -279,13 +306,16 @@
         await send(story.voice_note); advance(); render(); refocus();
       } else if (what === "to-gate") setStep(4);
       else if (what === "send-gate") {
-        S.story.savedAtGate = S.view?.metrics?.writes_saved || 0;
+        const savedBefore = S.view?.metrics?.writes_saved || 0;
         if (await send(story.gate)) {
-          if (pending().length) {
+          const gate = pending()[pending().length - 1];
+          if (gate) {
+            S.story.gateWrite = gate.id;
             await act({ type: "test", test: "commit_without_confirm" });
             const test = (S.view?.transcript || []).filter((t) => t.kind === "test").pop();
             S.story.testRefused = !!(test && test.refused);
           }
+          S.story.savedNow = (S.view?.metrics?.writes_saved || 0) - savedBefore;
           S.story.gateDone = true; save();
         }
         render(); refocus();
@@ -298,7 +328,10 @@
       else if (what === "send-lunch") {
         if (await send(story.off_topic)) { S.story.lunchDone = true; save(); }
         render(); refocus();
-      } else if (what === "free") { S.story = {}; await newChat(); setStep("free"); $("#input").value = ""; autosize(); $("#input").focus(); }
+      } else if (what === "free") {
+        S.story = {}; await newChat(); setStep("free"); $("#input").value = ""; autosize();
+        if (!isPhone()) $("#input").focus();  // on a phone the keyboard would cover the suggestions
+      }
     } catch (err) { toast(err.message); }
   }
 
@@ -319,33 +352,31 @@
   }
   function badge(it) {
     const loaded = it.skills || [];
-    const main = loaded.filter((s) => s !== "house-rules");
-    const shown = main.length ? main : loaded;
-    if (shown.length) {
-      const extra = loaded.filter((s) => !shown.includes(s));
-      return `<span class="skill">${icon("book")}Skill used: <b>${esc(shown.join(", "))}</b></span>` +
-        (extra.length ? `<span class="skill-plus">with <code>${esc(extra.join(", "))}</code></span>` : "");
+    if (loaded.length) {
+      const tasks = loaded.filter((s) => s !== "house-rules");
+      const names = (tasks.length ? tasks : loaded).map(label);
+      const withRules = tasks.length && loaded.includes("house-rules");
+      return `<span class="skill">${icon("book")}<span>${names.length > 1 ? "Skills" : "Skill"} used: <b>${esc(names.join(", "))}</b>${withRules ? `<span class="skill-extra"> + House rules</span>` : ""}</span></span>`;
     }
-    if ((it.skills_earlier || []).length) {
-      return `<span class="skill none">${icon("book")}No new skill: using ${esc(it.skills_earlier.filter((s) => s !== "house-rules").concat(["house-rules"]).filter((s, i, a) => a.indexOf(s) === i).join(", "))}</span>`;
-    }
-    return `<span class="skill none">${icon("book")}No skill used</span>`;
+    if ((it.skills_earlier || []).length) return `<span class="skill none">${icon("book")}<span>Using a skill loaded earlier</span></span>`;
+    return `<span class="skill none">${icon("book")}<span>No skill used</span></span>`;
   }
-  // The two times of a record, side by side: the CRM's clock, and what the broker said.
+  // The time the broker stated, beside the CRM's clock. A date with a warning is still a date.
   function statedBox(t) {
     if (!t || !t.text) return `<div class="time-box"><span>${esc(t ? t.label : "Stated time")}</span><b>None given</b><small>Left empty, not guessed</small></div>`;
     const exact = !!t.nice && !t.note;
-    return `<div class="time-box ${exact ? "exact" : "flagged"}"><span>${esc(t.label)}</span><b>"${esc(t.text)}"</b>
-      <small>${exact ? "Broker's words. Exact: " + esc(t.nice) : "Broker's words. Vague, so no date set"}</small></div>`;
+    const small = exact ? `Broker's words. Saved as ${esc(t.nice)}` : "Broker's words. Vague, so no date set";
+    return `<div class="time-box ${exact && !t.warning ? "exact" : "flagged"}"><span>${esc(t.label)}</span><b>"${esc(t.text)}"</b>
+      <small>${small}</small>${t.warning ? `<small class="warn-line">Check: ${esc(t.warning)}</small>` : ""}</div>`;
   }
   const systemBox = (at, prepared) => `<div class="time-box system"><span>Recorded at (CRM clock)</span><b>${at ? esc(day(at)) + ", " + esc(clock(at)) : "When you confirm"}</b>
-    <small>${at || !prepared ? "Set by the system, never typed" : `Set by the system. Prepared at ${esc(clock(prepared))}`}</small></div>`;
+    <small>${at || !prepared ? "Set by the system, never typed" : `Set by the system. Prepared ${esc(clock(prepared))}`}</small></div>`;
   function dueChip(t) {
     if (!t || !t.text) return `<span class="due">No date given</span>`;
-    if (t.nice && !t.note) return `<span class="due exact">Due ${esc(t.nice)}</span>`;
+    if (t.nice && !t.note) return `<span class="due ${t.warning ? "flagged" : "exact"}">Due ${esc(t.nice)}</span>`;
     return `<span class="due flagged">"${esc(t.text)}": kept as words</span>`;
   }
-  function readback(card, ring) {
+  function readback(card, ring, quiet) {
     const tasks = card.items.filter((it) => it.op === "create_task");
     const others = card.items.filter((it) => it.op !== "create_task");
     let body = others.map((it) => `<div class="rb-item"><div class="rb-kind">${icon(it.op === "create_note" ? "doc" : "database")}${esc(it.heading)}</div>
@@ -353,17 +384,25 @@
         ${it.lists.map(([k, vals]) => `<div class="rb-list"><b>${esc(k)}</b><ul>${vals.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`).join("")}</div>`).join("");
     if (tasks.length) {
       body += `<div class="rb-item"><div class="rb-kind">${icon("task")}${tasks.length === 1 ? "Task" : `Tasks (${tasks.length})`}</div>
-        <ul class="rb-tasks">${tasks.map((t) => `<li><span>${esc(t.rows[0][1])}</span>${dueChip(t.time)}</li>`).join("")}</ul></div>`;
+        <ul class="rb-tasks">${tasks.map((t) => {
+          const rows = Object.fromEntries(t.rows);
+          return `<li><div class="rb-task-head"><span>${esc(rows.Task)}</span>${dueChip(t.time)}</div>
+            <small>For ${esc(rows.For)} · Deal: ${esc(rows.Deal)}</small>${t.time && t.time.warning ? `<small class="warn-line">Check: ${esc(t.time.warning)}</small>` : ""}</li>`;
+        }).join("")}</ul></div>`;
+    }
+    if ((card.flags || []).length) {
+      body += `<div class="rb-item rb-flags"><div class="rb-kind">${icon("alert")}To check</div><ul>${card.flags.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></div>`;
     }
     const stated = others.filter((it) => it.time).map((it) => statedBox(it.time)).join("");
     const status = card.status;
-    const pill = status === "pending" ? `<span class="pill pill-pending">Waiting for your confirm</span>`
+    const pill = status === "pending" ? `<span class="pill pill-pending"><span class="pill-long">Waiting for your confirm</span><span class="pill-short">Not saved yet</span></span>`
       : status === "committed" ? `<span class="pill pill-saved">Saved</span>`
       : `<span class="pill pill-quiet">${status === "expired" ? "Expired" : "Discarded"}</span>`;
     const times = `<div class="times">${stated || ""}${systemBox(status === "committed" ? card.committed_at : null, card.proposed_at)}</div>`;
+    const ids = `data-hash="${esc(card.hash)}"`;
     const foot = status === "pending"
-      ? `${times}<div class="rb-actions"><span class="rb-note">Nothing is saved until you confirm.</span><button type="button" class="btn btn-secondary" data-discard="${esc(card.id)}">Discard</button>
-         <button type="button" class="btn btn-primary${ring ? " ring" : ""}" data-confirm="${esc(card.id)}">${icon("check")}Confirm and save</button></div>`
+      ? `${times}<div class="rb-actions"><span class="rb-note">Nothing is saved until you confirm.</span><button type="button" class="btn btn-secondary" data-discard="${esc(card.id)}" ${ids}>Discard</button>
+         <button type="button" class="btn ${quiet ? "btn-secondary" : "btn-primary"}${ring ? " ring" : ""}" data-confirm="${esc(card.id)}" ${ids}>${icon("check")}Confirm and save</button></div>`
       : status === "committed"
         ? `${times}<div class="rb-done">${icon("check-circle")}<span><b>Saved by ${esc(brokerName())}</b> with the Confirm button.</span></div>`
         : `<div class="rb-done off">${icon("x-circle")}<span>${status === "expired" ? "Expired after 30 minutes. Nothing was saved." : "Discarded. Nothing was saved."}</span></div>`;
@@ -380,16 +419,19 @@
       for (const it of items) for (const c of it.cards || []) if (c.status === "pending") return c.id;
       return null;
     })();
+    const inStory = S.step !== "free";
     let html = `<div class="bot">${spark()}<div class="bot-head"><span class="bot-name">Claude</span></div>
       <div class="answer">Hi ${esc(brokerFirst())}. Paste a voice note after a call or a tour, or ask me to update a record, prep a meeting, draft an email or sum up the pipeline.</div></div>`;
     items.forEach((it, idx) => {
       if (it.kind === "broker") {
         html += `<div class="out-row"><span class="sr-only">${esc(brokerName())}: </span><div class="bubble bubble-out" dir="auto">${esc(it.text)}</div></div>`;
       } else if (it.kind === "assistant") {
-        const cards = (it.cards || []).map((c) => readback(c, S.step === 2 && c.id === firstPendingCard)).join("");
+        // From step 4 on, Ravi's note keeps a quiet Confirm: the story is about what does not save.
+        const cards = (it.cards || []).map((c) => readback(c, S.step === 2 && c.id === firstPendingCard,
+          inStory && typeof S.step === "number" && S.step >= 4 && c.id === S.story.gateWrite)).join("");
         html += `<div class="bot">${spark()}
           <div class="bot-head"><span class="bot-name">Claude</span><span class="tag">${it.mode === "live" ? "AI" : "Fixed rules"}</span>${badge(it)}</div>
-          ${trace(it.steps, idx === lastBot && S.step === "free")}
+          ${trace(it.steps, idx === lastBot && S.step === "free" && !isPhone())}
           <div class="answer" dir="auto"><span class="sr-only">Claude: </span>${format(it.text)}</div>${cards}</div>`;
       } else if (it.kind === "notice") {
         html += `<div class="sys-line ${it.notice === "saved" ? "saved" : ""}">${icon(it.notice === "saved" ? "check-circle" : "x-circle", "i i-sm")}${esc(it.text)}</div>`;
@@ -411,6 +453,7 @@
     if (isPhone() && S.step !== "free" && S.step !== 2) box.scrollTop = box.scrollHeight;  // the newest item, just above the sheet
     else if ((lastKind === "assistant" || lastKind === "working") && lastBroker) box.scrollTop = Math.max(0, lastBroker.offsetTop - 12);
     else if (nearBottom || String(items.length) !== before) box.scrollTop = box.scrollHeight;
+    if (S.step === 2) showCard();
     renderComposer();
   }
   function renderComposer() {
@@ -444,17 +487,26 @@
     const shown = all ? list : list.slice(0, 8);
     const rows = shown.map((e) => {
       const outcome = e.outcome === "ok" ? "" : `<span class="pill ${e.outcome === "blocked" ? "pill-pending" : "pill-refused"}">${e.outcome === "blocked" ? "Blocked" : "Refused"}</span>`;
-      return `<li class="${e.outcome === "ok" ? "" : esc(e.outcome)}"><span class="at" title="${esc(e.at)}">${esc(clock24(e.at))}</span>
+      return `<li class="${e.outcome === "ok" ? "" : esc(e.outcome)}"><span class="at" title="${esc(e.at)}">${esc(clock(e.at))}</span>
         <span class="what">${esc(ACTIONS[e.action] || e.action)} ${esc(e.detail)}<span class="who">${esc(who(e.actor))}</span></span>${outcome}</li>`;
     }).join("");
     const more = list.length > shown.length ? `<div class="log-more"><button type="button" class="btn-link" data-log-all="1">Show all ${list.length} entries</button></div>` : "";
     return `<ul class="log">${rows}</ul>${more}`;
   }
-  function recordCard(r, ring) {
-    const sub = r.kind === "note" ? `Note · ${esc(r.contact)}` : r.kind === "task" ? `Task${r.contact ? " · " + esc(r.contact) : ""}` : esc(r.kind[0].toUpperCase() + r.kind.slice(1));
-    return `<article class="card rec${ring ? " ring-card" : ""}"><div class="rec-head"><span class="tile">${icon(r.kind === "task" ? "task" : r.kind === "note" ? "doc" : "database")}</span>
-      <div><div class="rec-title">${esc(r.title)}</div><div class="rec-sub">${sub}</div></div><span class="pill pill-saved">Saved</span></div>
-      <div class="times">${systemBox(r.recorded_at)}${r.time ? statedBox(r.time) : ""}</div></article>`;
+  // One card per save: the CRM's clock once, then each record with the time the broker stated.
+  function savedCard(records, ring) {
+    const first = records[0];
+    const note = records.find((r) => r.kind === "note");
+    const kinds = {};
+    records.forEach((r) => { kinds[r.kind] = (kinds[r.kind] || 0) + 1; });
+    const what = Object.entries(kinds).map(([k, n]) => count(n, k)).join(" and ");
+    const rows = records.map((r) => `<li><span class="tile sm">${icon(r.kind === "task" ? "task" : r.kind === "note" ? "doc" : "database")}</span>
+      <div><div class="saved-title">${esc(r.title)}</div><small>${r.kind === "note" ? "Note" : r.kind === "task" ? "Task" : esc(r.kind[0].toUpperCase() + r.kind.slice(1))}${r.contact ? " · " + esc(r.contact) : ""}</small></div>
+      ${r.kind === "task" ? dueChip(r.time) : ""}</li>`).join("");
+    return `<article class="card rec${ring ? " ring-card" : ""}"><div class="rec-head"><span class="tile">${icon("database")}</span>
+      <div><div class="rec-title">Saved ${esc(what)}</div><div class="rec-sub">${esc((note || first).title)}</div></div><span class="pill pill-saved">Saved</span></div>
+      <div class="times">${systemBox(first.recorded_at)}${note && note.time ? statedBox(note.time) : ""}</div>
+      <ul class="saved-list">${rows}</ul></article>`;
   }
   function renderCRM() {
     const v = S.view || { pending: [], saved: [], drafts: [], log: [], metrics: {}, deals: [] };
@@ -471,15 +523,14 @@
     }
     // Newest save first; inside one save, the order it was read back in (the note, then its tasks).
     const writes = [...new Set(v.saved.map((r) => r.write_id))].reverse();
-    const recent = writes.flatMap((w) => v.saved.filter((r) => r.write_id === w));
-    if (recent.length) {
-      html += `<div class="group-label">Saved in this demo</div>` + recent.map((r, i) => recordCard(r, S.step === 3 && i === 0)).join("");
+    if (writes.length) {
+      html += `<div class="group-label">Saved in this demo</div>` + writes.map((w, i) => savedCard(v.saved.filter((r) => r.write_id === w), S.step === 3 && i === 0)).join("");
     }
     if (v.drafts.length) {
       html += `<div class="group-label">Email drafts (never sent)</div>` + v.drafts.map((d) => `<article class="card rec"><div class="rec-head"><span class="tile">${icon("mail")}</span>
         <div><div class="rec-title">${esc(d.subject)}</div><div class="rec-sub">To ${esc(d.to_name)} · in ${esc(brokerFirst())}'s mailbox</div></div><span class="pill pill-quiet">Draft, not sent</span></div></article>`).join("");
     }
-    if (!v.pending.length && !recent.length && !v.drafts.length) {
+    if (!v.pending.length && !writes.length && !v.drafts.length) {
       html += `<div class="empty"><span class="tile">${icon("database")}</span><h3>Nothing new yet</h3>
         <p>When Claude prepares a change, it waits for the broker's confirm. Saved notes and tasks appear here with the CRM's own time.</p></div>`;
     }
@@ -497,12 +548,12 @@
     const cfg = S.config || {};
     const tokens = (n) => (n || 0).toLocaleString("en-US");
     const used = new Set(v.skills_used || []);
-    const skills = (cfg.skills || []).map((s) => `<li><span class="tick ${used.has(s.name) ? "" : "idle"}">${icon("check")}</span><span><code>${esc(s.name)}</code>: ${esc(s.description)}</span></li>`).join("");
+    const skills = (cfg.skills || []).map((s) => `<li><span class="tick ${used.has(s.name) ? "" : "idle"}">${icon("check")}</span><span><b>${esc(label(s.name))}</b> <code>${esc(s.name)}</code>: ${esc(s.description)}</span></li>`).join("");
     const deals = (v.deals || []).map((d) => `<tr><td>${esc(d.name)}</td><td>${esc(d.stage)}</td><td>${esc(d.owner)}</td></tr>`).join("");
     const raw = (v.log || []).slice(-40).map((e) => `${e.at}  ${e.actor} | ${e.action} | ${e.ref || "-"} | ${e.outcome}\n  ${e.detail}`).join("\n");
     const model = cfg.model ? prettyModel(cfg.model) : "not configured";
     return `<details class="card fold" id="hood"${S.hoodOpen ? " open" : ""}><summary><span class="tile">${icon("cpu")}</span>
-      <div><div class="fold-title">Under the hood</div><div class="fold-sub">Who answers, how skills load, usage, the raw log, deals</div></div>${icon("chev-down", "i chev")}</summary>
+      <div><div class="fold-title">Under the hood</div><div class="fold-sub">Who answers, the six skills, usage, the raw log, deals</div></div>${icon("chev-down", "i chev")}</summary>
       <div class="hood-body">
         <div><h4>Who answers</h4><div class="seg" role="group" aria-label="Who answers">
           <button type="button" data-mode="live" aria-pressed="${S.live && !!cfg.live}"${cfg.live ? "" : " disabled"}><span class="live-dot"></span>Live AI (${esc(model)})</button>
@@ -561,8 +612,8 @@
       if (t.dataset.go) go(t.dataset.go);
       else if (t.dataset.chip !== undefined) send(S.config.chips[+t.dataset.chip].text);
       else if (t.dataset.confirm) {
-        act({ type: "confirm", write_id: t.dataset.confirm }).then((ok) => { if (ok) { announce("Saved to the CRM."); advance(); } });
-      } else if (t.dataset.discard) act({ type: "discard", write_id: t.dataset.discard }).then(() => renderStory());
+        act({ type: "confirm", write_id: t.dataset.confirm, hash: t.dataset.hash }).then((done) => { if (done) { announce("Saved to the CRM."); advance(); } });
+      } else if (t.dataset.discard) act({ type: "discard", write_id: t.dataset.discard, hash: t.dataset.hash }).then(() => renderStory());
       else if (t.dataset.logAll) { S.logAll = true; renderCRM(); }
       else if (t.dataset.mode) { S.live = t.dataset.mode === "live"; store.set("teamos-live", S.live); renderCRM(); }
       else if (t.dataset.pane) setPane(t.dataset.pane);
@@ -585,11 +636,12 @@
     const saved = store.get("teamos-demo");
     if (saved && saved.session) {
       S.session = saved.session; S.story = saved.story || {}; S.step = saved.step ?? 0;
-      try { await step({ type: "view" }); } catch { S.view = null; }
+      let kept = null;
+      try { kept = await step({ type: "view" }); } catch { S.view = null; }
+      if (!kept) { S.step = 0; S.story = {}; }  // a chat from another day or older rules: start over
     }
     if (!S.view) { await newChat(); S.step = 0; }
     render();
-    if (S.step === 2) showCard();
   }
   init();
 })();

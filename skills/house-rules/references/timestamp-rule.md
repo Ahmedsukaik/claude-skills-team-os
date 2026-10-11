@@ -22,7 +22,7 @@ turn into a date.
 | "last week", "next Tuesday", "end of the month" | no, kept as words | relative |
 | "around October 23, 2026" | no, kept as words | approximate |
 | "October 23" | no, kept as words | no year |
-| "10/23/2026" | no, kept as words | day and month order is not certain |
+| "10/11/2026" | no, kept as words | day and month order is not certain |
 | "Thursday, October 23, 2026" | no, flagged | that date is a Friday: ask which is right |
 | "October 23, 2026 at 3" | no, kept as words | morning or afternoon is not said |
 

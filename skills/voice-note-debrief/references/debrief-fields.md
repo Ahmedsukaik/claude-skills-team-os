@@ -12,7 +12,7 @@ Where each part of a voice note goes in the CRM. Every debrief is one `propose_w
 | Property | `property_id` | only if the broker named or clearly described one property |
 | Deal | `deal_id` | the open deal for this company and property; leave out if unclear |
 | Headline | `summary` | one line, at most 200 characters |
-| What was discussed | `discussed` | list, two to five short facts in the broker's words |
+| What was discussed | `discussed` | list, one to five short facts in the broker's words |
 | Next steps | `next_steps` | list, the actions as the broker named them |
 | When it happened | `stated_time_text` | the broker's exact words ("yesterday afternoon"), or leave out |
 

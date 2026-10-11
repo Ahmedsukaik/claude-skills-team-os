@@ -13,9 +13,10 @@ Note: <summary>
 - Discussed:
   - <item>
   - <item>
+- Next steps: <item>; <item>
 
 Tasks:
-- <title>: due <date the CRM set>, or "no date given"
+- <title>: due <date the CRM set> | "<their words>" (kept as words) | no date given
 - <title>: due ...
 
 Flags: <every flag from the proposal, or "none">
@@ -23,5 +24,7 @@ Flags: <every flag from the proposal, or "none">
 Reply yes to save it, or tell me what to change.
 ```
 
-Keep it short: no extra commentary before or after. Where the page shows a read back card with a
-Confirm button, end with "Press Confirm on the card to save it." instead of "Reply yes".
+Keep it short: no extra commentary before or after.
+
+In the web demo the page shows this read back as a card with a Confirm button: keep the text short,
+point to the card, and end with "Press Confirm on the card to save it." instead of "Reply yes".

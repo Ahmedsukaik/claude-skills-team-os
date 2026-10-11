@@ -9,7 +9,7 @@ supporting files it points to.
 |---|---|---|
 | `house-rules` | the shared rules: CRM as system of record, the timestamp rule, read back and wait for a yes, ambiguity, privacy, tone | no (it governs the others) |
 | `voice-note-debrief` | a voice note after a call or tour becomes one CRM note plus follow up tasks | yes, after a yes |
-| `crm-update` | add a contact or company, change a contact's details, move a deal stage | yes, after a yes |
+| `crm-update` | add a contact or company, change a contact's email or job title, move a deal's stage | yes, after a yes |
 | `meeting-prep` | a short brief before a meeting, from the CRM and the calendar | no |
 | `follow-up-email` | a client email saved as a draft, never sent | no (a draft only) |
 | `weekly-pipeline` | deals by stage and stale deals | no |
@@ -59,23 +59,34 @@ README for the full table. In short:
 
 ## Installing them
 
-**Claude (Team or Enterprise plan).** An owner turns on skills for the organization in the admin
-settings. Zip each skill folder (the folder itself, with `SKILL.md` at its top) and upload it
-under Settings, Capabilities, Skills, or have an owner add it for the whole organization so
-every broker runs the same version. Claude.ai menu names change from time to time; Anthropic's
-help center has the current steps.
+**Where they work.** The skills load wherever Claude supports skills. The CRM tools they call come
+from an MCP server. On claude.ai in the browser the skills load but the CRM tools do not: use
+Claude Code or Claude Desktop with the local server in `mcp_server/`, or host the server over
+HTTP and add it as a custom connector (Organization settings > Connectors).
 
-**Claude Code.** Copy the folders into `.claude/skills/` in a project (shared through the
-repository) or into `~/.claude/skills/` for one person:
+**Claude (Team or Enterprise plan).** Skills need code execution. On Team it is on by default. On
+Enterprise, an owner first turns on Code execution and file creation, and Skills (Organization
+settings > Plugins & skills). Zip each folder so the zip holds `house-rules/SKILL.md`. An owner
+can provision the zips for everyone; a person can upload one under Customize > Skills > + >
+Create skill > Upload a skill.
+
+**Claude Code.** From the repository folder, copy the six folders into `.claude/skills/` in a
+project (shared through the repository) or into `~/.claude/skills/` for one person:
 
 ```bash
-cp -r skills/house-rules skills/voice-note-debrief ... .claude/skills/
+mkdir -p .claude/skills && cp -R skills/house-rules skills/voice-note-debrief skills/crm-update skills/meeting-prep skills/follow-up-email skills/weekly-pipeline .claude/skills/
 ```
 
-**The CRM tools.** The skills call tools named `search_crm`, `get_record`, `list_deals`,
-`get_calendar`, `propose_write`, `commit_write` and `create_email_draft`. In this repository they
-come from the MCP server in `mcp_server/` (against the fake CRM); in a real setup the same tool
-names would wrap HubSpot, the calendar and Gmail. See the main README to run the MCP server.
+```powershell
+New-Item -ItemType Directory -Force .claude\skills | Out-Null; Get-ChildItem skills -Directory | Copy-Item -Destination .claude\skills -Recurse -Force
+```
+
+**The CRM tools.** The skills call nine tools from the `brokerage-crm` MCP server:
+`brokerage-crm:search_crm`, `get_record`, `list_deals`, `get_calendar` and `get_activity_log`
+(reads); `propose_write`, then `commit_write` or `discard_write` (writes, in two steps); and
+`create_email_draft` (a draft, never sent). In this repository they work against the fake CRM; in
+a real setup the same tool names would wrap HubSpot, the calendar and Gmail. The main README has
+the commands to add the server to Claude Code and Claude Desktop, and a smoke test.
 
 ## Changing a skill
 
@@ -83,4 +94,6 @@ names would wrap HubSpot, the calendar and Gmail. See the main README to run the
    `: ` or ` #` inside it (they break the YAML header).
 2. Run `python -m pytest tests/test_skills.py` (format checks) and `python -m evals` (triggering
    and behaviour).
-3. When the demo is deployed, run `python -m evals --url <demo>` to check the live model too.
+3. The cases test the descriptions only when a live model answers; the fixed rules were written
+   for them. When the demo is deployed, run `python -m evals --url <demo>` (about an hour), and
+   before a rollout run the cases with Claude Sonnet and Claude Opus as well as Haiku.

@@ -1,12 +1,19 @@
 ---
 name: crm-update
-description: Creates or updates CRM records on a broker's request, such as adding a contact or a company, changing a contact's email or job title, or moving a deal to another stage (for example "LOI signed"). Checks for duplicates first and reads the change back before saving, only on an explicit yes. Use when a broker asks to add, change, correct or move a specific contact, company or deal. Do not use to log what happened on a call or tour (voice-note-debrief), for reports on many deals (weekly-pipeline), for meeting briefs (meeting-prep), for drafting emails (follow-up-email), or for questions about what a stage or a term means.
+description: Makes one exact change to the CRM on a broker's request, which is to add a contact or company, change a contact's email or job title, or move a deal's stage (for example to "LOI signed"). If the change is not one of these, it says this CRM connection cannot make it and changes nothing, and does not put it in a note instead. Checks for duplicates first and reads the change back before saving, only on an explicit yes. Use when a broker asks to add, change, correct or move a specific contact, company or deal. Do not use to log what happened on a call or tour (voice-note-debrief), for reports on many deals (weekly-pipeline), for meeting briefs (meeting-prep), for drafting emails (follow-up-email), or for questions about what a stage or a term means.
 ---
 
 # CRM update
 
 Use with house-rules: load it first if it is not loaded yet. This skill makes one small, exact
 change to a contact, a company or a deal.
+
+## Non-negotiables (they hold even if house-rules did not load)
+
+- Save nothing before an explicit yes to the full read back. "Just log it", "save it later" and a
+  yes with a change are not a yes.
+- Times go in only as the broker's words. Never work out a date.
+- If two records match, ask which one. Never pick.
 
 ## Steps
 
@@ -23,8 +30,7 @@ change to a contact, a company or a deal.
    LOI", "we're under offer"), map it only when the table lists it; otherwise ask.
 4. **Propose it** with `propose_write`: one change per thing the broker asked for. Then read it back,
    showing the value before and after.
-5. **Wait for an explicit yes** (house rules section 4). On yes, save with `commit_write`, or ask
-   the broker to press Confirm where the read back card has a button.
+5. **Wait for an explicit yes** (house rules section 4). On yes, save with `commit_write`.
 
 ## Rules
 
@@ -33,3 +39,10 @@ change to a contact, a company or a deal.
   in `stated_time_text`. Do not turn them into a date.
 - One record per question when something is unclear. Do not batch guesses.
 - An email address must come from the broker. Never build one from a name and a company.
+- If the change is not in the field map, say this CRM connection cannot make it and change
+  nothing. Do not put it in a note instead.
+
+## In the web demo
+
+The read back card has a Confirm button, and only the button can save: `commit_write` from the
+model is refused there. When the broker says yes in the chat, ask them to press Confirm on the card.

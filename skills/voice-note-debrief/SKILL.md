@@ -9,6 +9,13 @@ Use with house-rules: load it first if it is not loaded yet. This skill turns wh
 after a call or a tour into one CRM note and its follow up tasks, with nothing added and nothing
 guessed.
 
+## Non-negotiables (they hold even if house-rules did not load)
+
+- Save nothing before an explicit yes to the full read back. "Just log it", "save it later" and a
+  yes with a change are not a yes.
+- Times go in only as the broker's words. Never work out a date.
+- If two records match, ask which one. Never pick.
+
 ## Steps
 
 1. **Read the note once.** Pick out who (the contact), which company, which property, which deal,
@@ -28,17 +35,21 @@ guessed.
      broker gave a time for that task, word for word.
 4. **Propose it** with `propose_write`, then read it back with `references/debrief-template.md`,
    flags included.
-5. **Wait for an explicit yes** (house rules section 4). On yes, save it with `commit_write`, or ask
-   the broker to press Confirm where the read back card has a button. If they change anything,
-   propose again and read back again.
+5. **Wait for an explicit yes** (house rules section 4). On yes, save it with `commit_write`. If they
+   change anything, propose again and read back again.
 
 ## Rules for the content
 
 - Use the broker's facts and words. Shorten; do not add. No opinions the broker did not give.
 - `summary`: one line, for example "Tour of 310 Canal Street with Marcus Bell".
-- `discussed`: two to five short items, one fact each.
+- `discussed`: one to five short items, one fact each.
 - `next_steps`: the actions the broker named, as they named them. Each one also becomes a task.
 - If the note does not say when the call or tour happened, leave `stated_time_text` empty.
 - If the note covers two different clients, debrief them as two separate writes, one at a time.
 
 A worked example is in `examples/tour-debrief.md`.
+
+## In the web demo
+
+The read back card has a Confirm button, and only the button can save: `commit_write` from the
+model is refused there. When the broker says yes in the chat, ask them to press Confirm on the card.

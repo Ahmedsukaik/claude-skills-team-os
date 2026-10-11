@@ -3,6 +3,8 @@
 A read back is the person's one chance to catch a mistake before it reaches the CRM. Show every
 field that will be saved, in plain words, in the same order as the proposal.
 
+A task skill's own template sets the shape; these rules still apply.
+
 ## Shape
 
 ```
@@ -16,7 +18,7 @@ Note: <summary>
 - Discussed: <item>; <item>
 - Next steps: <item>; <item>
 
-Task: <title>, due <date or "no date given">
+Task: <title>, due <date> | "<their words>" (kept as words) | no date given
 
 Flags: <each flag from the proposal, or "none">
 

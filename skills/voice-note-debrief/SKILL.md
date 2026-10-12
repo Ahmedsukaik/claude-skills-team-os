@@ -1,11 +1,11 @@
 ---
 name: voice-note-debrief
-description: Turns a broker's voice note or rough notes from right after a client call, meeting or property tour into a structured CRM debrief (contact, company, property, what was discussed, next steps, follow up date), reads it back, and on an explicit yes saves one CRM note plus follow up tasks. Use when a broker pastes or dictates notes about a conversation or tour that already happened, even without the word "debrief" (for example "just left the tour at 310 Canal with Marcus..."). Do not use to change a contact's details or a deal stage on its own (crm-update), to prepare for a meeting that has not happened yet (meeting-prep), to write to the client (follow-up-email), or for general questions about voice notes or note taking.
+description: Turns a broker's voice note or rough notes from right after a client call, meeting or property tour into a structured CRM debrief (contact, company, property, what was discussed, next steps, follow up date), reads it back, and on an explicit yes saves one CRM note plus follow up tasks. Use when a broker pastes or dictates notes about a conversation or tour that already happened, even without the word "debrief" (for example "just left the tour at 310 Canal with Marcus..."). Do not use to change a contact's details or a deal stage on its own (crm-update), to prepare for a meeting that has not happened yet (meeting-prep), to write to the client (follow-up-email), or for general questions about voice notes or note taking. Always load it together with house-rules.
 ---
 
 # Voice note debrief
 
-Load house-rules first if it is not loaded in this chat. This skill turns what a broker said
+Before anything else, load house-rules unless it is already loaded in this chat, even for read only work: it sets what may be shown to the broker (names, never record ids), privacy and tone. This skill turns what a broker said
 after a call or a tour into one CRM note and its follow up tasks, with nothing added and nothing
 guessed.
 

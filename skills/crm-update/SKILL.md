@@ -1,11 +1,11 @@
 ---
 name: crm-update
-description: Makes one exact change to the CRM on a broker's request, which is to add a contact or company, change a contact's email or job title, or move a deal's stage (for example to "LOI signed"). If the change is not one of these, it says this CRM connection cannot make it and changes nothing, and does not put it in a note instead. Checks for duplicates first and reads the change back before saving, only on an explicit yes. Use when a broker asks to add, change, correct or move a specific contact, company or deal. Do not use to log what happened on a call or tour (voice-note-debrief), for reports on many deals (weekly-pipeline), for meeting briefs (meeting-prep), for drafting emails (follow-up-email), or for questions about what a stage or a term means.
+description: Makes one exact change to the CRM on a broker's request, which is to add a contact or company, change a contact's email or job title, or move a deal's stage (for example to "LOI signed"). If the change is not one of these, it says this CRM connection cannot make it and changes nothing, and does not put it in a note instead. Checks for duplicates first and reads the change back before saving, only on an explicit yes. Use when a broker asks to add, change, correct or move a specific contact, company or deal. Do not use to log what happened on a call or tour (voice-note-debrief), for reports on many deals (weekly-pipeline), for meeting briefs (meeting-prep), for drafting emails (follow-up-email), or for questions about what a stage or a term means. Always load it together with house-rules.
 ---
 
 # CRM update
 
-Load house-rules first if it is not loaded in this chat. This skill makes one small, exact
+Before anything else, load house-rules unless it is already loaded in this chat, even for read only work: it sets what may be shown to the broker (names, never record ids), privacy and tone. This skill makes one small, exact
 change to a contact, a company or a deal.
 
 ## Non-negotiables (they hold even if house-rules did not load)

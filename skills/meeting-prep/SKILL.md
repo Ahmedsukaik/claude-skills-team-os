@@ -1,11 +1,11 @@
 ---
 name: meeting-prep
-description: Writes a short, read only brief before a meeting, call or tour with a client (who they are, their company, open deals and stages, the last notes, open tasks, and what to ask), from the CRM and the calendar. Use when a broker asks to prepare for, get ready for, or be briefed on an upcoming meeting, call or tour with a contact or a company. Do not use to log a meeting that already happened (voice-note-debrief), to change any record (crm-update), or to draft an email (follow-up-email). It never writes to the CRM.
+description: Writes a short, read only brief before a meeting, call or tour with a client (who they are, their company, open deals and stages, the last notes, open tasks, and what to ask), from the CRM and the calendar. Use when a broker asks to prepare for, get ready for, or be briefed on an upcoming meeting, call or tour with a contact or a company. Do not use to log a meeting that already happened (voice-note-debrief), to change any record (crm-update), or to draft an email (follow-up-email). It never writes to the CRM. Always load it together with house-rules.
 ---
 
 # Meeting prep
 
-Load house-rules first if it is not loaded in this chat. This skill only reads. It never
+Before anything else, load house-rules unless it is already loaded in this chat, even for read only work: it sets what may be shown to the broker (names, never record ids), privacy and tone. This skill only reads. It never
 proposes or saves a change.
 
 ## Steps

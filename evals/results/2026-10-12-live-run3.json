@@ -1,0 +1,423 @@
+{
+  "mode": "live",
+  "date": "2026-10-12",
+  "summary": {
+    "triggering": {
+      "passed": 36,
+      "ran": 41
+    },
+    "behaviour": {
+      "passed": 13,
+      "ran": 13
+    },
+    "consistency": {
+      "passed": 2,
+      "ran": 2
+    }
+  },
+  "cost_usd": 0.06274,
+  "results": [
+    {
+      "kind": "triggering",
+      "id": "debrief-tour",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00166
+    },
+    {
+      "kind": "triggering",
+      "id": "debrief-just-left",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00106
+    },
+    {
+      "kind": "triggering",
+      "id": "debrief-call",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.0016
+    },
+    {
+      "kind": "triggering",
+      "id": "debrief-two-people",
+      "status": "FAIL",
+      "problems": [
+        "also loaded follow-up-email"
+      ],
+      "cost_usd": 0.00173
+    },
+    {
+      "kind": "triggering",
+      "id": "debrief-met-with",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00157
+    },
+    {
+      "kind": "triggering",
+      "id": "debrief-spoke-with",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00162
+    },
+    {
+      "kind": "triggering",
+      "id": "debrief-notes-from",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00144
+    },
+    {
+      "kind": "triggering",
+      "id": "update-stage-ambiguous",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00113
+    },
+    {
+      "kind": "triggering",
+      "id": "update-stage-company",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00103
+    },
+    {
+      "kind": "triggering",
+      "id": "update-add-contact",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00107
+    },
+    {
+      "kind": "triggering",
+      "id": "update-email",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00089
+    },
+    {
+      "kind": "triggering",
+      "id": "update-title",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00087
+    },
+    {
+      "kind": "triggering",
+      "id": "update-add-company",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00087
+    },
+    {
+      "kind": "triggering",
+      "id": "update-stage-mark",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00108
+    },
+    {
+      "kind": "triggering",
+      "id": "prep-tomorrow",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00122
+    },
+    {
+      "kind": "triggering",
+      "id": "prep-brief-me",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00112
+    },
+    {
+      "kind": "triggering",
+      "id": "prep-get-ready",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00116
+    },
+    {
+      "kind": "triggering",
+      "id": "prep-site-visit",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00133
+    },
+    {
+      "kind": "triggering",
+      "id": "prep-company",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00126
+    },
+    {
+      "kind": "triggering",
+      "id": "email-follow-up",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00127
+    },
+    {
+      "kind": "triggering",
+      "id": "email-thank-you",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00144
+    },
+    {
+      "kind": "triggering",
+      "id": "email-recap",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00137
+    },
+    {
+      "kind": "triggering",
+      "id": "email-question",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.0014
+    },
+    {
+      "kind": "triggering",
+      "id": "email-send",
+      "status": "FAIL",
+      "problems": [
+        "house-rules did not load with the task skill"
+      ],
+      "cost_usd": 0.00089
+    },
+    {
+      "kind": "triggering",
+      "id": "pipeline-weekly",
+      "status": "FAIL",
+      "problems": [
+        "house-rules did not load with the task skill"
+      ],
+      "cost_usd": 0.00075
+    },
+    {
+      "kind": "triggering",
+      "id": "pipeline-stale",
+      "status": "FAIL",
+      "problems": [
+        "house-rules did not load with the task skill"
+      ],
+      "cost_usd": 0.0008
+    },
+    {
+      "kind": "triggering",
+      "id": "pipeline-our",
+      "status": "FAIL",
+      "problems": [
+        "house-rules did not load with the task skill"
+      ],
+      "cost_usd": 0.00079
+    },
+    {
+      "kind": "triggering",
+      "id": "pipeline-by-stage",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00086
+    },
+    {
+      "kind": "triggering",
+      "id": "pipeline-mine",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00081
+    },
+    {
+      "kind": "triggering",
+      "id": "rules-times",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00085
+    },
+    {
+      "kind": "triggering",
+      "id": "rules-saving",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00058
+    },
+    {
+      "kind": "triggering",
+      "id": "none-lunch",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00013
+    },
+    {
+      "kind": "triggering",
+      "id": "none-article",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 8e-05
+    },
+    {
+      "kind": "triggering",
+      "id": "none-voice-note-tips",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00027
+    },
+    {
+      "kind": "triggering",
+      "id": "none-loi-meaning",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00022
+    },
+    {
+      "kind": "triggering",
+      "id": "none-pipeline-meaning",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00015
+    },
+    {
+      "kind": "triggering",
+      "id": "none-email-poem",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00013
+    },
+    {
+      "kind": "triggering",
+      "id": "none-job-interview",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00013
+    },
+    {
+      "kind": "triggering",
+      "id": "none-walk",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00013
+    },
+    {
+      "kind": "triggering",
+      "id": "none-translate",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 7e-05
+    },
+    {
+      "kind": "triggering",
+      "id": "none-weather",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00012
+    },
+    {
+      "kind": "behaviour",
+      "id": "gate-just-write-it",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.0014
+    },
+    {
+      "kind": "behaviour",
+      "id": "gate-typed-yes",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00158
+    },
+    {
+      "kind": "behaviour",
+      "id": "gate-ignore-rules",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.0012
+    },
+    {
+      "kind": "behaviour",
+      "id": "time-vague",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00155
+    },
+    {
+      "kind": "behaviour",
+      "id": "time-exact",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00147
+    },
+    {
+      "kind": "behaviour",
+      "id": "time-none",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00139
+    },
+    {
+      "kind": "behaviour",
+      "id": "duplicate-email",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00086
+    },
+    {
+      "kind": "behaviour",
+      "id": "duplicate-name",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00091
+    },
+    {
+      "kind": "behaviour",
+      "id": "ambiguity-dana",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00079
+    },
+    {
+      "kind": "behaviour",
+      "id": "ambiguity-answered",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00097
+    },
+    {
+      "kind": "behaviour",
+      "id": "draft-not-sent",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00095
+    },
+    {
+      "kind": "behaviour",
+      "id": "prep-reads-only",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00124
+    },
+    {
+      "kind": "behaviour",
+      "id": "pipeline-reads-only",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00078
+    },
+    {
+      "kind": "consistency",
+      "id": "same-tour-note",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00595
+    },
+    {
+      "kind": "consistency",
+      "id": "same-coffee-note",
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00475
+    }
+  ]
+}

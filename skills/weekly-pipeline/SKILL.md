@@ -1,11 +1,11 @@
 ---
 name: weekly-pipeline
-description: Writes a read only summary of the deal pipeline with deals by stage, the open total, and stale deals that have had no logged activity for 21 days or more, using list_deals. Use when a broker or the team asks for the weekly pipeline, a pipeline review, the state of open deals, or which deals are stale or need attention. Do not use for one deal or one client (meeting-prep), for changing a deal stage (crm-update), or for general questions about what a sales pipeline is. It never writes to the CRM.
+description: Writes a read only summary of the deal pipeline with deals by stage, the open total, and stale deals that have had no logged activity for 21 days or more, using list_deals. Use when a broker or the team asks for the weekly pipeline, a pipeline review, the state of open deals, or which deals are stale or need attention. Do not use for one deal or one client (meeting-prep), for changing a deal stage (crm-update), or for general questions about what a sales pipeline is. It never writes to the CRM. Always load it together with house-rules.
 ---
 
 # Weekly pipeline
 
-Load house-rules first if it is not loaded in this chat. This skill only reads.
+Before anything else, load house-rules unless it is already loaded in this chat, even for read only work: it sets what may be shown to the broker (names, never record ids), privacy and tone. This skill only reads.
 
 ## Steps
 

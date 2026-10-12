@@ -17,7 +17,7 @@ supporting files it points to.
 ## How they work together
 
 - **house-rules always applies.** Its description tells Claude to load it with any task skill,
-  and every task skill starts with "Load house-rules first if it is not loaded in this chat". A task skill adds
+  and every task skill says "Always load it together with house-rules" in its description and starts with "Before anything else, load house-rules unless it is already loaded in this chat". A task skill adds
   steps; it never removes a house rule. When they disagree, house-rules wins.
 - **One task skill per request.** The descriptions say what each skill is for and, just as
   important, what it is not for, naming the skill that is ("Do not use to log a call

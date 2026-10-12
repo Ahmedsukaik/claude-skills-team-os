@@ -92,7 +92,7 @@ descriptions do the triggering, and each one has three parts:
   not happened yet (meeting-prep)..." This is what stops a skill from firing when it should not.
 
 **Precedence.** `house-rules` describes itself as the rules for any CRM or client task, to load
-with the task skill; every task skill starts with "Load house-rules first if it is not loaded in this chat". A task
+with the task skill; every task skill says "Always load it together with house-rules" in its description and starts with "Before anything else, load house-rules unless it is already loaded in this chat". A task
 skill adds steps and never removes a house rule; when they disagree, house-rules wins. In the web
 demo, the code also refuses any write until house-rules is loaded in the chat, so the rules
 cannot be skipped by accident.

@@ -55,8 +55,7 @@ A worked example is in `examples/tour-debrief.md`.
 
 ## In the web demo
 
-The page shows `propose_write`'s card as the read back, so the chat reply is one or two sentences:
-what is ready, any vague time kept in the broker's words, and "Press Confirm, or tell me what to
-change." Do not repeat the card in prose. The card has a Confirm button, and only the button can
-save: `commit_write` from the model is refused there. When the broker says yes in the chat, ask them
-to press Confirm on the card.
+In the web demo the card is the read back. Your text reply is at most two short sentences: what is
+ready and any time kept in the broker's words. Do not list the fields again. The card has a Confirm
+button, and only the button can save: `commit_write` from the model is refused there. When the
+broker says yes in the chat, ask them to press Confirm on the card.

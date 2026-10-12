@@ -9,7 +9,7 @@ rules. Claude reads every change back, nothing is saved without a yes, and times
 
 ![The demo: a broker's voice note becomes a read back, the broker confirms, the CRM records it with its own clock](docs/img/tour.gif)
 
-*Recorded with the fixed rules (no AI); the live demo answers with Claude Haiku 5.5.*
+*Recorded from the live demo, answered by Claude Haiku 5.5 (12 Oct 2026).*
 
 **Why you can check it rather than trust it**
 

@@ -29,6 +29,9 @@ turn into a date.
 ## Do
 
 - Copy the words exactly: `"stated_time_text": "yesterday afternoon"`.
+- Copy the whole phrase around a date: "by Friday, October 23, 2026" keeps its "by" (a deadline, not
+  an agreed day), and "two weeks after the tour, which is Friday, October 23, 2026" stays whole. A
+  plain "on" or "due" in front of a date may be left out.
 - Mention the flag in the read back: "When it happened: 'yesterday afternoon' (kept as your words,
   no date set)."
 - Leave the field empty when no time was given.

@@ -5,7 +5,7 @@ description: Writes a read only summary of the deal pipeline with deals by stage
 
 # Weekly pipeline
 
-Use with house-rules: load it first if it is not loaded yet. This skill only reads.
+Load house-rules first if it is not loaded in this chat. This skill only reads.
 
 ## Steps
 

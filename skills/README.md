@@ -17,7 +17,7 @@ supporting files it points to.
 ## How they work together
 
 - **house-rules always applies.** Its description tells Claude to load it with any task skill,
-  and every task skill starts with "Use with house-rules: load it first". A task skill adds
+  and every task skill starts with "Load house-rules first if it is not loaded in this chat". A task skill adds
   steps; it never removes a house rule. When they disagree, house-rules wins.
 - **One task skill per request.** The descriptions say what each skill is for and, just as
   important, what it is not for, naming the skill that is ("Do not use to log a call
@@ -51,7 +51,7 @@ README for the full table. In short:
 | Rule | In the skill | In code |
 |---|---|---|
 | propose, then save | yes | yes: nothing saves without `propose_write` first, a matching hash and a confirmation |
-| read back, wait for a yes | yes | web demo: only the Confirm button can save; MCP: the person's words are required and checked |
+| read back, wait for a yes | yes | web demo: only the Confirm button can save; MCP: `commit_write` needs a `user_confirmation` that reads as a plain yes; "just log it, don't ask me" or "yes, but change the date" are refused, and the words are logged. The server cannot tell whether the person or the model typed them. |
 | timestamps | yes | yes: `recorded_at` from the CRM clock; a stated time becomes a date only when exact |
 | duplicates | yes | yes: a duplicate contact or company is blocked and the match returned |
 | ambiguity (two Danas) | yes | no: the read back card shows the full name and company, so a wrong pick is caught before saving |
@@ -64,18 +64,22 @@ from an MCP server. On claude.ai in the browser the skills load but the CRM tool
 Claude Code or Claude Desktop with the local server in `mcp_server/`, or host the server over
 HTTP and add it as a custom connector (Organization settings > Connectors).
 
-**Claude (Team or Enterprise plan).** Skills need code execution. On Team it is on by default. On
-Enterprise, an owner first turns on Code execution and file creation, and Skills (Organization
-settings > Plugins & skills). Zip each folder so the zip holds `house-rules/SKILL.md`. An owner
+**Claude (Team or Enterprise plan).** Skills need code execution. On Team, Skills are on by
+default; check that Code execution and file creation is on. On Enterprise, an owner turns on both
+in Organization settings > Plugins & skills. Zip each folder so the zip holds `house-rules/SKILL.md`. An owner
 can provision the zips for everyone; a person can upload one under Customize > Skills > + >
 Create skill > Upload a skill.
 
 **Claude Code.** From the repository folder, copy the six folders into `.claude/skills/` in a
 project (shared through the repository) or into `~/.claude/skills/` for one person:
 
+macOS or Linux:
+
 ```bash
 mkdir -p .claude/skills && cp -R skills/house-rules skills/voice-note-debrief skills/crm-update skills/meeting-prep skills/follow-up-email skills/weekly-pipeline .claude/skills/
 ```
+
+Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force .claude\skills | Out-Null; Get-ChildItem skills -Directory | Copy-Item -Destination .claude\skills -Recurse -Force
@@ -84,7 +88,9 @@ New-Item -ItemType Directory -Force .claude\skills | Out-Null; Get-ChildItem ski
 **The CRM tools.** The skills call nine tools from the `brokerage-crm` MCP server:
 `brokerage-crm:search_crm`, `get_record`, `list_deals`, `get_calendar` and `get_activity_log`
 (reads); `propose_write`, then `commit_write` or `discard_write` (writes, in two steps); and
-`create_email_draft` (a draft, never sent). In this repository they work against the fake CRM; in
+`create_email_draft` (a draft, never sent). The skills write them as `brokerage-crm:search_crm`
+(server and tool, the form Anthropic's skill guide recommends); Claude Code lists the same tool as
+`mcp__brokerage-crm__search_crm`. In this repository they work against the fake CRM; in
 a real setup the same tool names would wrap HubSpot, the calendar and Gmail. The main README has
 the commands to add the server to Claude Code and Claude Desktop, and a smoke test.
 

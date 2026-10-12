@@ -9,6 +9,20 @@ Each request becomes one or more changes in one `propose_write`.
 | add a company | `create_company` | `name` | `industry` |
 | move a deal to a stage | `update_deal_stage` | `deal_id`, `stage` | `stated_time_text` |
 
+## Exactly which fields each op takes
+
+The CRM refuses any other field (for example, `create_task` does not take `company_id`), so a
+first proposal with only these fields goes through.
+
+| op | Required | Optional, and nothing else |
+|---|---|---|
+| `create_note` | `contact_id`, `summary` | `company_id`, `deal_id`, `property_id`, `discussed`, `next_steps`, `stated_time_text` |
+| `create_task` | `title` | `contact_id`, `deal_id`, `due_text` |
+| `create_contact` | `first_name`, `last_name`, `email`, `company_id` | `job_title` |
+| `create_company` | `name` | `industry` |
+| `update_contact` | `contact_id` | `email`, `job_title` (at least one of them) |
+| `update_deal_stage` | `deal_id`, `stage` | `stated_time_text` |
+
 ## Notes
 
 - `company_id`, `contact_id` and `deal_id` come from `search_crm`. If the company of a new contact

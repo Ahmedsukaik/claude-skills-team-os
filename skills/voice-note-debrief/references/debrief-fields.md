@@ -25,6 +25,10 @@ Where each part of a voice note goes in the CRM. Every debrief is one `propose_w
 | Deal | `deal_id` | the same deal as the note, if any |
 | When it is due | `due_text` | the broker's exact words for this task only, or leave out |
 
+These are all the fields. `create_note` takes nothing else, and `create_task` takes only `title`,
+`contact_id`, `deal_id` and `due_text` (no `company_id`, no `property_id`): the CRM refuses any other
+field, so a first proposal with only these goes through.
+
 ## Never
 
 - Never fill `stated_time`, `due` or `recorded_at`: the CRM sets them.

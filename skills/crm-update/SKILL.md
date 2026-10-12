@@ -5,7 +5,7 @@ description: Makes one exact change to the CRM on a broker's request, which is t
 
 # CRM update
 
-Use with house-rules: load it first if it is not loaded yet. This skill makes one small, exact
+Load house-rules first if it is not loaded in this chat. This skill makes one small, exact
 change to a contact, a company or a deal.
 
 ## Non-negotiables (they hold even if house-rules did not load)
@@ -29,7 +29,9 @@ change to a contact, a company or a deal.
    `references/deal-stages.md`, spelled as there. If the broker uses another word ("signed the
    LOI", "we're under offer"), map it only when the table lists it; otherwise ask.
 4. **Propose it** with `propose_write`: one change per thing the broker asked for. Then read it back,
-   showing the value before and after.
+   showing the value before and after. The read back is the `propose_write` call: call it in the same turn, once you have the records.
+   Never give the read back only as text, and never stop after the lookups. If the CRM refuses a
+   propose, fix the field it names and propose again in the same turn.
 5. **Wait for an explicit yes** (house rules section 4). On yes, save with `commit_write`.
 
 ## Rules
@@ -44,5 +46,8 @@ change to a contact, a company or a deal.
 
 ## In the web demo
 
-The read back card has a Confirm button, and only the button can save: `commit_write` from the
-model is refused there. When the broker says yes in the chat, ask them to press Confirm on the card.
+The page shows `propose_write`'s card as the read back, so the chat reply is one or two sentences:
+what is ready, any vague time kept in the broker's words, and "Press Confirm, or tell me what to
+change." Do not repeat the card in prose. The card has a Confirm button, and only the button can
+save: `commit_write` from the model is refused there. When the broker says yes in the chat, ask them
+to press Confirm on the card.

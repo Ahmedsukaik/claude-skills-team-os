@@ -5,7 +5,7 @@ description: Turns a broker's voice note or rough notes from right after a clien
 
 # Voice note debrief
 
-Use with house-rules: load it first if it is not loaded yet. This skill turns what a broker said
+Load house-rules first if it is not loaded in this chat. This skill turns what a broker said
 after a call or a tour into one CRM note and its follow up tasks, with nothing added and nothing
 guessed.
 
@@ -34,7 +34,9 @@ guessed.
    - one `create_task` per next step, and one for the follow up. Fill `due_text` only when the
      broker gave a time for that task, word for word.
 4. **Propose it** with `propose_write`, then read it back with `references/debrief-template.md`,
-   flags included.
+   flags included. The read back is the `propose_write` call: call it in the same turn, once you have the records.
+   Never give the read back only as text, and never stop after the lookups. If the CRM refuses a
+   propose, fix the field it names and propose again in the same turn.
 5. **Wait for an explicit yes** (house rules section 4). On yes, save it with `commit_write`. If they
    change anything, propose again and read back again.
 
@@ -46,10 +48,15 @@ guessed.
 - `next_steps`: the actions the broker named, as they named them. Each one also becomes a task.
 - If the note does not say when the call or tour happened, leave `stated_time_text` empty.
 - If the note covers two different clients, debrief them as two separate writes, one at a time.
+- A next step like "send him the HVAC specs" becomes a task, not an email draft. Do not draft or
+  send an email inside a debrief; that is follow-up-email, when the broker asks for an email.
 
 A worked example is in `examples/tour-debrief.md`.
 
 ## In the web demo
 
-The read back card has a Confirm button, and only the button can save: `commit_write` from the
-model is refused there. When the broker says yes in the chat, ask them to press Confirm on the card.
+The page shows `propose_write`'s card as the read back, so the chat reply is one or two sentences:
+what is ready, any vague time kept in the broker's words, and "Press Confirm, or tell me what to
+change." Do not repeat the card in prose. The card has a Confirm button, and only the button can
+save: `commit_write` from the model is refused there. When the broker says yes in the chat, ask them
+to press Confirm on the card.

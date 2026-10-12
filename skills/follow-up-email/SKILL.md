@@ -1,11 +1,11 @@
 ---
 name: follow-up-email
-description: Drafts a follow up email from a broker to a client contact, based on the CRM record and the latest notes, and saves it as a draft for the broker to review. It never sends anything. Use when a broker asks to write, draft or prepare an email, a thank you, a recap or a reply to a contact who is in the CRM. Do not use for internal messages to colleagues, to log a call (voice-note-debrief), to change records (crm-update), or for general writing help that does not involve a CRM contact.
+description: Drafts a follow up email from a broker to a client contact, based on the CRM record and the latest notes, and saves it as a draft for the broker to review. It never sends anything. Use when a broker asks to write, draft or prepare an email, a thank you, a recap or a reply to a contact who is in the CRM. Do not use for voice notes or debriefs that mention sending something (voice-note-debrief turns those into tasks), for internal messages to colleagues, to log a call (voice-note-debrief), to change records (crm-update), or for general writing help that does not involve a CRM contact.
 ---
 
 # Follow up email
 
-Use with house-rules: load it first if it is not loaded yet. This skill writes a draft. Sending is
+Load house-rules first if it is not loaded in this chat. This skill writes a draft. Sending is
 always the broker's own action, outside this skill.
 
 ## Steps

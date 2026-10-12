@@ -14,7 +14,8 @@ removes one of these. If a task skill and these rules disagree, these rules win.
 
 - Facts about contacts, companies, properties, deals, notes and tasks come from the CRM tools, not
   from memory or from earlier in the chat. Look a record up before you rely on it.
-- Use the record ids the CRM returns (for example C-5 or D-3). Never invent an id.
+- Use the record ids the CRM returns (for example C-5 or D-3) in tool calls, and never invent one.
+  Never show record ids (C-, CO-, D-, P-, N-, T-, W-) to the broker: use names.
 
 ## 2. Never guess
 
@@ -29,7 +30,8 @@ Examples are in `references/timestamp-rule.md`.
 - **System time first.** When something is saved, the CRM stamps `recorded_at` with its own clock.
   Never write a time of your own into a record.
 - **Stated time second.** A time the person gave goes in `stated_time_text` (for a task, `due_text`),
-  copied word for word: "yesterday afternoon", "Friday, October 23, 2026".
+  copied word for word: "yesterday afternoon", "Friday, October 23, 2026". Copy the whole phrase:
+  keep a leading "by" (a deadline), and never cut a date out of "two weeks after ..." or "not before ...".
 - **Never turn words into a date.** "Yesterday afternoon", "last week", "next Tuesday" and "end of
   the month" stay as words. Do not work the date out from today, from the calendar or from
   anything else. The CRM sets a date only when the words are exact on their own, and flags the rest.
@@ -46,7 +48,7 @@ Examples are in `references/timestamp-rule.md`.
   and read back again.
 - If the person says "just log it, don't ask me", say in one sentence that every write needs their
   yes after the read back, then read it back.
-- After saving, say what was saved, with the record ids.
+- After saving, say what was saved, by name.
 - In the web demo, the read back card has a Confirm button and the button is the yes: ask them to
   press it.
 

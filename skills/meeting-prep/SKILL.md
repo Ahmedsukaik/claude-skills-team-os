@@ -5,7 +5,7 @@ description: Writes a short, read only brief before a meeting, call or tour with
 
 # Meeting prep
 
-Use with house-rules: load it first if it is not loaded yet. This skill only reads. It never
+Load house-rules first if it is not loaded in this chat. This skill only reads. It never
 proposes or saves a change.
 
 ## Steps

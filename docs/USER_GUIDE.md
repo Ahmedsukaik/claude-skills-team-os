@@ -22,8 +22,9 @@ deal in the CRM, and prepares one note and a task for each next step.
 Before anything is saved, Claude shows a card with exactly what will be recorded:
 
 - **the note**: who, which company, which property and deal, what was discussed, next steps;
-- **the tasks**, each with who it is for, which deal, and its due date (or "No date given");
-- **the times**: when it happened, in your words, next to "Recorded at: when you confirm";
+- **the tasks**, each with its due date (or "No date given"), and who it is for and which deal
+  when that is not the same as the note's;
+- **the times**: when it happened, in your words, next to "CRM clock: when you confirm";
 - **To check**: anything Claude wants you to look at, such as a vague time kept as words, or a
   date said with "by" (a deadline, not an agreed day).
 
@@ -39,7 +40,7 @@ next day the page starts a new one.
 
 The CRM keeps two times for every record:
 
-- **Recorded at**: the CRM's own clock, at the moment you confirm. Nobody types it.
+- **CRM clock**: the CRM's own time, at the moment you confirm. Nobody types it.
 - **The time you stated**, in your words. It becomes a date only when your words are exact.
 
 "Friday, October 23, 2026" or "October 23, 2026 at 3 pm" become a date. "Yesterday afternoon",

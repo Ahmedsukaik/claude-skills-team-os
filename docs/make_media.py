@@ -2,7 +2,8 @@
 
     python docs/make_media.py                         starts the demo in this process (fixed rules
                                                       unless ANTHROPIC_API_KEY is set) and stops it
-    python docs/make_media.py https://your-demo.vercel.app
+    python docs/make_media.py https://your-demo.vercel.app       records the tour from a deployed demo
+    python docs/make_media.py --url https://your-demo.vercel.app (the same)
 
 Needs Playwright with an installed Chrome or Edge, and ffmpeg on the PATH for the GIF.
 Writes docs/img/tour.gif, docs/img/tour.mp4 and docs/img/screen-*.png.
@@ -63,7 +64,7 @@ def story(page: Page, shots: bool, pause: int = 1) -> None:
     page.locator(".story-title", has_text="Your turn").wait_for(timeout=120000)
     page.wait_for_timeout(3200 * pause)
     shot("readback")
-    page.locator("[data-confirm]").first.click()
+    page.locator("[data-confirm][data-armed='1']").first.click()   # Confirm counts once the card has been read
     page.locator(".story-title", has_text="Saved, with").wait_for()
     page.wait_for_timeout(3500 * pause)
     shot("saved")
@@ -132,4 +133,10 @@ def main(url: str | None) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else None)
+    import argparse
+    parser = argparse.ArgumentParser(description="Record the demo story and the README images.")
+    parser.add_argument("base", nargs="?", help="a deployed demo's address; without it, a local demo with the fixed rules")
+    parser.add_argument("--url", help="the same as the positional address")
+    args = parser.parse_args()
+    address = args.url or args.base
+    main(address.rstrip("/") if address else None)

@@ -15,7 +15,7 @@ rules. Claude reads every change back, nothing is saved without a yes, and times
 
 - The rules that must never break are in code, not only in the prompt: in the demo only the
   broker's Confirm button can save, and the CRM refuses every other save.
-- 505 automated tests, including the page in a real browser at five screen sizes.
+- 508 automated tests, including the page in a real browser at five screen sizes.
 - 60 evaluation chats: 41 triggering cases, 13 behaviour cases and the same notes from three
   brokers. With Claude Haiku 5.5 through the live demo, the latest run passed 54 of the 56 cases,
   and every run is listed below with what changed after it.
@@ -33,7 +33,7 @@ made up; it is not a client project and makes no claims about results.
 | `mcp_server/` | the CRM's tools as an MCP server, so the skills run in Claude Code or Claude Desktop against the fake CRM |
 | `teamos/` + `public/` | the web demo: a broker's Claude chat on the left, the CRM on the right |
 | `evals/` | 41 triggering cases, 13 behaviour cases, and a consistency check across three brokers |
-| `tests/` | 505 tests, including the page in a real browser at five screen sizes |
+| `tests/` | 508 tests, including the page in a real browser at five screen sizes |
 | `docs/USER_GUIDE.md` | for the brokers |
 
 ## The six skills
@@ -301,7 +301,7 @@ would wrap HubSpot, the calendar and Gmail drafts, and the rest stays.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest -q          # 505 tests
+python -m pytest -q          # 508 tests
 ruff check . && mypy && mypy .   # all clean
 python -m evals              # the evaluation with the fixed rules (no AI, no cost)
 python -m evals --url URL    # the same cases through a deployed demo, 45 seconds apart

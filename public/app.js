@@ -8,7 +8,7 @@
   const $ = (sel) => document.querySelector(sel);
   const S = {
     config: null, session: null, view: null, live: true, busy: false, step: 0, wait: "", story: {},
-    pane: "broker", hoodOpen: false, logOpen: true, logAll: false, keyboard: false,
+    pane: "broker", hoodOpen: false, logOpen: true, logAll: false, keyboard: false, openReplies: new Set(),
   };
   // People read skill names, not file names. The file names stay under Under the hood.
   const LABELS = { "house-rules": "House rules", "voice-note-debrief": "Voice note debrief", "crm-update": "CRM update",
@@ -538,10 +538,18 @@
         // From step 4 on, Ravi's note keeps a quiet Confirm: the story is about what does not save.
         const cards = (it.cards || []).map((c) => readback(c, S.step === 2 && c.id === firstPendingCard,
           inStory && typeof S.step === "number" && S.step >= 4 && c.id === S.story.gateWrite)).join("");
+        // A reply that brings a read back card: the card is the read back, so Claude's text shows two
+        // lines and opens on request (a model may write the whole read back out again in prose).
+        const key = (it.cards || []).length ? it.cards[0].id : "";
+        const open = key && S.openReplies.has(key);
+        const answer = key
+          ? `<div class="answer clamp${open ? " open" : ""}" id="ans-${esc(key)}" dir="auto"><span class="sr-only">Claude: </span>${format(it.text)}</div>
+             <button type="button" class="more-toggle" data-more="${esc(key)}" aria-controls="ans-${esc(key)}" aria-expanded="${open}">${open ? "Show less" : "Show Claude's full message"}</button>`
+          : `<div class="answer" dir="auto"><span class="sr-only">Claude: </span>${format(it.text)}</div>`;
         html += `<div class="bot">${spark()}
           <div class="bot-head"><span class="bot-name">Claude</span><span class="tag">${it.mode === "live" ? "AI" : "Fixed rules"}</span>${badge(it)}</div>
           ${trace(it.steps, false)}
-          <div class="answer" dir="auto"><span class="sr-only">Claude: </span>${format(it.text)}</div>${cards}</div>`;
+          ${answer}${cards}</div>`;
       } else if (it.kind === "notice") {
         html += `<div class="sys-line ${it.notice === "saved" ? "saved" : ""}">${icon(it.notice === "saved" ? "check-circle" : "x-circle", "i i-sm")}${esc(it.text)}</div>`;
       } else if (it.kind === "test") {
@@ -558,6 +566,7 @@
     });
     const before = box.dataset.count || "";
     box.innerHTML = html;
+    fitToggles(box);
     box.dataset.count = String(items.length);
     const lastBroker = [...box.querySelectorAll(".out-row")].pop();
     const lastKind = items.length ? items[items.length - 1].kind : "";
@@ -573,6 +582,13 @@
     if (!newest) S.lastCard = null;
     document.body.classList.toggle("chat-started", items.some((it) => it.kind === "broker"));
     renderComposer();
+  }
+  // A toggle only where the clamped text has more to show.
+  function fitToggles(root) {
+    root.querySelectorAll(".more-toggle").forEach((b) => {
+      const text = document.getElementById(b.getAttribute("aria-controls"));
+      b.hidden = !!text && !text.classList.contains("open") && text.scrollHeight <= text.clientHeight + 1;
+    });
   }
   function renderComposer() {
     const input = $("#input");
@@ -764,7 +780,14 @@
         if (t.dataset.armed !== "1") return;   // the card just appeared: read it first
         act({ type: "confirm", write_id: t.dataset.confirm, hash: t.dataset.hash }).then((done) => { if (done) { announce("Saved to the CRM."); advance(); } });
       } else if (t.dataset.discard) act({ type: "discard", write_id: t.dataset.discard, hash: t.dataset.hash }).then(() => renderStory());
-      else if (t.dataset.logAll) { S.logAll = true; renderCRM(); }
+      else if (t.dataset.more) {
+        const key = t.dataset.more, text = document.getElementById(t.getAttribute("aria-controls"));
+        const open = !S.openReplies.has(key);
+        if (open) S.openReplies.add(key); else S.openReplies.delete(key);
+        text?.classList.toggle("open", open);
+        t.setAttribute("aria-expanded", String(open));
+        t.textContent = open ? "Show less" : "Show Claude's full message";
+      } else if (t.dataset.logAll) { S.logAll = true; renderCRM(); }
       else if (t.dataset.mode) { S.live = t.dataset.mode === "live"; store.set("teamos-live", S.live); renderCRM(); }
       else if (t.dataset.pane) setPane(t.dataset.pane);
     });

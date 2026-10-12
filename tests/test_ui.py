@@ -474,3 +474,51 @@ def test_the_story_band_keeps_its_button_in_one_place(browser, site):
     assert len({round(s["x"]) for s in spots}) == 1 and len({round(s["y"]) for s in spots}) == 1
     context.close()
     assert errors == []
+
+
+@pytest.mark.parametrize("size", [(1440, 900), (1280, 720)], ids=["1440x900", "1280x720"])
+def test_a_long_live_reply_does_not_push_the_card_away(browser, size):
+    """A model that writes the whole read back out again in prose: the page shows two lines of it
+    with a toggle, and the whole card, Confirm included, stays in view at step 2."""
+    prose = "\n".join(["Here is the debrief I prepared for Marcus Bell at Tessarine Biotech."] +
+                      [f"- Discussed point {i}: the lab benches, the loading dock and the HVAC" for i in range(1, 9)] +
+                      ["Press Confirm on the card to save, or tell me what to change."])
+    changes = [{"op": "create_note", "contact_id": "C-5", "deal_id": "D-3", "property_id": "P-5",
+                "summary": "Tour of 310 Canal Street with Marcus Bell", "discussed": ["Liked the loading dock"],
+                "stated_time_text": "yesterday afternoon"},
+               {"op": "create_task", "title": "Send Marcus the HVAC specs", "contact_id": "C-5", "deal_id": "D-3"}]
+    live = ScriptedModel([tool(1, "load_skill", name="house-rules"), tool(2, "load_skill", name="voice-note-debrief")],
+                         [tool(3, "propose_write", summary="Tour of 310 Canal Street with Marcus Bell", changes=changes)],
+                         [text(prose)])
+    url, server = start_server(Agent(live=live))
+    try:
+        context, page, errors = open_page(browser, url, *size)
+        button(page, "Start the demo").click()
+        button(page, "Send Priya's voice note").click()
+        page.locator(".story-title", has_text="Your turn").wait_for(timeout=15000)
+        card = page.locator(".rb.ring-card")
+        settled(page, card.locator(".rb-head"))
+        settled(page, armed_confirm(page))
+        assert card.evaluate("c => !c.classList.contains('fit')")   # nothing scrolls inside the card either
+        toggle = page.get_by_role("button", name="Show Claude's full message")
+        assert toggle.is_visible() and toggle.get_attribute("aria-expanded") == "false"
+        answer = page.locator(".answer.clamp")
+        assert answer.evaluate("a => a.scrollHeight > a.clientHeight + 4")   # clamped to two lines
+        toggle.focus()
+        page.keyboard.press("Enter")
+        expect(page.get_by_role("button", name="Show less")).to_have_attribute("aria-expanded", "true")
+        assert answer.evaluate("a => a.scrollHeight <= a.clientHeight + 1") and "Discussed point 8" in answer.inner_text()
+        context.close()
+        assert errors == []
+    finally:
+        server.should_exit = True
+
+
+def test_a_short_reply_with_a_card_has_no_toggle(browser, site):
+    context, page, errors = open_page(browser, site)
+    button(page, "Start the demo").click()
+    button(page, "Send Priya's voice note").click()
+    page.locator(".story-title", has_text="Your turn").wait_for()
+    assert page.locator(".more-toggle").first.is_hidden()   # the fixed rules' two lines need no toggle
+    context.close()
+    assert errors == []

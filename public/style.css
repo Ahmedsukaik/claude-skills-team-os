@@ -770,3 +770,19 @@ body[data-step="0"] .story { display: flex; flex-direction: column; min-height: 
   .pk-long { display: none; }
   .pk-short { display: inline; }
 }
+
+/* a reply with a read back card: two lines of Claude's text, the rest on request */
+.answer.clamp:not(.open) { max-height: calc(2 * var(--leading-md)); overflow: hidden; }
+.more-toggle {
+  justify-self: start; margin-top: -4px; padding: 2px 0; min-height: 24px; font-size: var(--text-xs); line-height: 16px;
+  font-weight: var(--weight-medium); color: var(--color-accent-text); text-decoration: underline; text-decoration-color: var(--color-accent-border);
+  text-underline-offset: 3px;
+}
+.more-toggle:hover { color: var(--color-text); text-decoration-color: currentColor; }
+@media (max-height: 760px) and (min-width: 901px) {
+  body[data-step="2"] .answer.clamp:not(.open) { max-height: 42px; }   /* two lines at the step's 14px / 21px */
+}
+@media (max-width: 900px) {
+  body[data-step="2"] .bot:has(.ring-card) .answer.clamp:not(.open) { max-height: 40px; }   /* two lines at 14px / 20px */
+  body[data-step="2"] .bot:has(.ring-card) .more-toggle { margin-top: -8px; min-height: 22px; }
+}

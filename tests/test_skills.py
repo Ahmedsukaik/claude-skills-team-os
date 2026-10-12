@@ -39,7 +39,7 @@ def test_descriptions_say_what_when_and_when_not(name):
 @pytest.mark.parametrize("name", [n for n in NAMES if n != "house-rules"])
 def test_every_task_skill_defers_to_house_rules_and_names_its_neighbours(name):
     skill = LIBRARY.get(name)
-    assert skill.body.splitlines()[2].startswith("Use with house-rules")
+    assert skill.body.splitlines()[2].startswith("Load house-rules first if it is not loaded in this chat.")
     others = [n for n in NAMES if n not in (name, "house-rules")]
     assert sum(n in skill.description for n in others) >= 2, "the description points near misses to the right skill"
 

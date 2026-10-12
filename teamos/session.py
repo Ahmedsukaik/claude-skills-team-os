@@ -264,6 +264,29 @@ def _broker(r: Replay, event: dict[str, Any]) -> None:
     r.turn_skills, r.turn_writes = [], []
 
 
+SCALAR = (str, int, float, bool, type(None))
+
+
+def _tool_input_shape_ok(name: str, data: dict[str, Any]) -> bool:
+    """Tool inputs are flat: plain values, except propose_write's changes, a list of flat objects
+    whose values are plain values or lists of them. With strict tool schemas off, a model can send
+    anything; a nested input would be signed into the chat and then break every later request (the
+    page's depth limit), so it is refused here and the fixed rules answer that step instead."""
+    for key, value in data.items():
+        if isinstance(value, SCALAR):
+            continue
+        if name == "propose_write" and key == "changes" and isinstance(value, list):
+            for change in value:
+                if not isinstance(change, dict):
+                    return False
+                for v in change.values():
+                    if not (isinstance(v, SCALAR) or (isinstance(v, list) and all(isinstance(x, SCALAR) for x in v))):
+                        return False
+            continue
+        return False
+    return True
+
+
 def _validate_blocks(r: Replay, content: Any, allow_empty: bool) -> list[dict[str, Any]]:
     if not isinstance(content, list) or len(content) > MAX_BLOCKS:
         raise SessionError("bad assistant turn")
@@ -285,7 +308,8 @@ def _validate_blocks(r: Replay, content: Any, allow_empty: bool) -> list[dict[st
             tid, name, data = b.get("id"), b.get("name"), b.get("input")
             if not isinstance(tid, str) or not TOOL_ID.fullmatch(tid) or tid in r.tool_ids or tid in ids:
                 raise SessionError("bad tool id")
-            if name not in TOOL_NAMES or not isinstance(data, dict) or len(json.dumps(data)) > MAX_TOOL_INPUT:
+            if name not in TOOL_NAMES or not isinstance(data, dict) or len(json.dumps(data)) > MAX_TOOL_INPUT \
+                    or not _tool_input_shape_ok(str(name), data):
                 raise SessionError("bad tool call")
             ids.add(tid)
             out.append({"type": "tool_use", "id": tid, "name": name, "input": data})

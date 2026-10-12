@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from datetime import date
@@ -141,7 +142,7 @@ def judge_behaviour(case: dict[str, Any], view: dict[str, Any], mode: str) -> li
     changes = [c for w in view["pending"] for c in w["changes"]]
     for want in expect.get("times", []):
         key = "due" if want["op"] == "create_task" else "stated_time"
-        found = [c for c in changes if c["op"] == want["op"] and (c.get(f"{key}_text") or "").lower() == (want["text"] or "").lower()
+        found = [c for c in changes if c["op"] == want["op"] and same_words(c.get(f"{key}_text"), want["text"])
                  and c.get(key) == want["value"]]
         if not found:
             got = [(c["op"], c.get(f"{key}_text"), c.get(key)) for c in changes if c["op"] == want["op"]]
@@ -153,6 +154,14 @@ def judge_behaviour(case: dict[str, Any], view: dict[str, Any], mode: str) -> li
     return problems
 
 
+def same_words(said: str | None, wanted: str | None) -> bool:
+    """The stated words, with or without a leading "on" or "due" ("on October 30, 2026" and
+    "October 30, 2026" say the same; "by" does not, it makes a deadline)."""
+    def bare(t: str | None) -> str:
+        return re.sub(r"^(?:on|due)\s+", "", (t or "").strip().lower())
+    return bare(said) == bare(wanted)
+
+
 STRUCTURED = ("op", "contact_id", "company_id", "deal_id", "property_id", "stated_time", "due", "stage")
 
 
@@ -161,7 +170,7 @@ def structured(view: dict[str, Any]) -> list[tuple[Any, ...]]:
     out = []
     for w in view["pending"]:
         for c in w["changes"]:
-            words = (c.get("stated_time_text") or c.get("due_text") or "").lower()
+            words = re.sub(r"^(?:on|due)\s+", "", (c.get("stated_time_text") or c.get("due_text") or "").strip().lower())
             out.append(tuple(c.get(k) for k in STRUCTURED) + (words,))
     return sorted(out, key=lambda t: tuple(str(x) for x in t))
 

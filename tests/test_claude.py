@@ -45,7 +45,9 @@ def test_the_request_caches_the_skill_list_and_switches_thinking_off(monkeypatch
     assert "<available_skills>" in req["system"][0]["text"]
     assert req["thinking"] == {"type": "disabled"} and req["output_config"] == {"effort": "low"}
     assert req["cache_control"] == {"type": "ephemeral"}
-    assert all(t["strict"] is True for t in req["tools"]) and req["messages"] is MESSAGES
+    assert all("strict" not in t for t in req["tools"]) and req["messages"] is MESSAGES  # strict is off by default
+    monkeypatch.setenv("TEAMOS_STRICT_TOOLS", "on")
+    assert all(t["strict"] is True for t in model().request(SYSTEM_PROMPT, TOOLS, MESSAGES)["tools"])
 
 
 def test_strict_tool_schemas_close_every_object():
@@ -157,7 +159,7 @@ def test_the_real_sdk_sends_the_expected_request_and_reads_the_reply():
     assert seen["headers"]["x-api-key"] == "sk-local-test-not-a-real-key" and "anthropic-version" in seen["headers"]
     assert body["thinking"] == {"type": "disabled"} and body["output_config"] == {"effort": "low"}
     assert body["cache_control"] == {"type": "ephemeral"} and body["system"][0]["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
-    assert [t["name"] for t in body["tools"]] == [t["name"] for t in TOOLS] and body["tools"][0]["strict"] is True
+    assert [t["name"] for t in body["tools"]] == [t["name"] for t in TOOLS] and "strict" not in body["tools"][0]  # off by default
     assert body["tools"][0]["input_schema"]["properties"]["name"]["enum"][0] == "crm-update"
     assert turn.content == [{"type": "tool_use", "id": "toolu_local_1", "name": "load_skill", "input": {"name": "weekly-pipeline"}}]
     assert turn.usage["cache_creation_input_tokens"] == 3900 and turn.model == "claude-haiku-5-5"

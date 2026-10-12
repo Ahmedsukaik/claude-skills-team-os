@@ -5,7 +5,7 @@ from datetime import date
 
 import pytest
 
-from crm.timestamps import nice, read_stated_time, relative_near
+from crm.timestamps import lead_word, nice, read_stated_time, relative_near
 
 TODAY = date(2026, 10, 12)
 
@@ -109,3 +109,27 @@ def test_dates_read_nicely():
     assert nice("2026-10-23") == "Fri, Oct 23, 2026"
     assert nice("2026-10-23T15:30") == "Fri, Oct 23, 2026, 3:30 PM"
     assert nice(None) == ""
+
+
+@pytest.mark.parametrize("text, date_part, near", [
+    ("Follow up two weeks after the tour, which is Friday, October 23, 2026.", "Friday, October 23, 2026", "two weeks"),
+    ("Send the lease prior to Friday, October 23, 2026.", "Friday, October 23, 2026", "prior to"),
+    ("We need it ahead of October 30, 2026.", "October 30, 2026", "ahead of"),
+    ("Call him the Monday following October 30, 2026.", "October 30, 2026", "following"),
+    ("Due October 30, 2026 plus two days.", "October 30, 2026", "plus"),
+    ("Done on October 30, 2026 if not sooner.", "October 30, 2026", "if not sooner"),
+    ("Sign it no later than October 30, 2026.", "October 30, 2026", "no later than"),
+    ("After the inspection we sign, so book Friday, October 23, 2026.", "Friday, October 23, 2026", "After"),
+    ("Following up with Marcus on Friday, October 23, 2026.", "Friday, October 23, 2026", None),
+    ("Two weeks ago he toured it. Follow up on Friday, October 23, 2026.", "Friday, October 23, 2026", None),
+])
+def test_a_relative_cue_anywhere_earlier_in_the_clause_counts(text, date_part, near):
+    start = text.index(date_part)
+    found = relative_near(text, start, start + len(date_part))
+    assert (found.lower() if found else None) == (near.lower() if near else None)
+
+
+def test_the_word_before_a_date_is_found():
+    for text, word in (("send it by Friday, October 23, 2026", "by"), ("follow up on October 30, 2026", None),
+                       ("due October 30, 2026", None), ("follow up with Ravi Menon October 30, 2026", None)):
+        assert lead_word(text, text.index("October" if "Friday" not in text else "Friday")) == word

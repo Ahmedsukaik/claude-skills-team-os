@@ -378,7 +378,7 @@ def test_a_write_with_different_records_still_goes_through(crm):
     {"op": "create_company", "name": " " + chr(0x2066) + chr(0x2069)},
 ])
 def test_a_required_field_that_is_empty_once_cleaned_is_refused(crm, change):
-    with pytest.raises(CRMError, match="empty value does not count"):
+    with pytest.raises(CRMError, match="an empty value, or one with no letter or digit, does not count"):
         propose(crm, change)
 
 
@@ -424,3 +424,81 @@ def test_errors_carry_plain_words_for_people(crm):
         crm.commit_write("assistant", p["write_id"], p["payload_hash"], None)
     assert caught.value.plain == "Only the broker can save this, with Confirm. Nothing was saved."
     assert "Tell the broker" in caught.value.message and crm.log[-1]["detail"] == caught.value.plain
+
+
+
+# ------------------------------------------------------------------ invisible characters and separators
+INVISIBLE = [0x061C, 0x00AD, 0x034F, 0x180E, 0xE0041, 0xE007F, 0x3164, 0x115F, 0x2800, 0xFE0F, 0xE0100, 0x200B, 0x202E,
+             0x2066, 0xFEFF]
+
+
+@pytest.mark.parametrize("point", INVISIBLE, ids=[f"U+{p:04X}" for p in INVISIBLE])
+def test_an_invisible_character_cannot_hide_a_duplicate(crm, point):
+    with pytest.raises(CRMError) as caught:
+        propose(crm, {**NEW_NORA, "first_name": "Da" + chr(point) + "na", "last_name": "Whitlock", "email": "dw2@example.com",
+                      "company_id": "CO-1"})
+    assert caught.value.code == "duplicate_contact" and caught.value.extra["match"]["id"] == "C-1"
+
+
+@pytest.mark.parametrize("first", ["Da-na", "Da.na", "Da na", "Da" + chr(0x00AD) + "na", "DA_NA"])
+def test_a_separator_cannot_split_a_name(crm, first):
+    with pytest.raises(CRMError) as caught:
+        propose(crm, {**NEW_NORA, "first_name": first, "last_name": "Whitlock", "email": "dw3@example.com", "company_id": "CO-1"})
+    assert caught.value.code == "duplicate_contact"
+
+
+@pytest.mark.parametrize("change", [
+    {**NOTE, "summary": "..."},
+    {**NOTE, "summary": chr(0x2800) * 4},
+    {"op": "create_task", "title": "-- !!"},
+    {**NEW_NORA, "last_name": chr(0x3164)},
+    {"op": "create_company", "name": "&"},
+])
+def test_a_required_field_needs_a_letter_or_digit(crm, change):
+    with pytest.raises(CRMError, match="no letter or digit"):
+        propose(crm, change)
+
+
+def test_invisible_characters_are_removed_from_saved_text(crm):
+    p = propose(crm, {**NOTE, "summary": "Tour" + chr(0x00AD) + chr(0xE0041) + " of 310 Canal" + chr(0xFE0F)})
+    assert p["changes"][0]["summary"] == "Tour of 310 Canal"
+
+
+# ------------------------------------------------------------------ companies: suffixes and look-alikes
+@pytest.mark.parametrize("name", ["Tessarine Biotech Ltd", "Tessarine Biotech Group", "TESSARINE BIOTECH, INC.",
+                                  "Tessarine Biotech Corporation", "Tessarine Bio-tech GmbH"])
+def test_a_company_suffix_does_not_make_a_new_company(crm, name):
+    with pytest.raises(CRMError) as caught:
+        propose(crm, {"op": "create_company", "name": name})
+    assert caught.value.code == "duplicate_company" and caught.value.extra["match"]["name"] == "Tessarine Biotech"
+
+
+def test_a_company_that_starts_like_another_is_flagged_on_the_card(crm):
+    p = propose(crm, {"op": "create_company", "name": "Quillon"})
+    assert p["changes"][0]["similar_to"] == "Quillon Logistics (CO-1)"
+    assert any("looks like Quillon Logistics" in f for f in p["flags"])
+    item = crm.readback(crm.writes[p["write_id"]])[0]
+    assert ["Looks like", "Quillon Logistics (CO-1)"] in item["rows"]
+    assert propose(crm, {"op": "create_company", "name": "Fernway Pharmacy"})["flags"] == []
+
+
+def test_a_malformed_change_is_refused_not_a_crash(crm):
+    for change in ({"op": ["create_note"]}, {"op": {"x": 1}}):
+        with pytest.raises(CRMError, match="Unknown op"):
+            propose(crm, change)
+
+
+@pytest.mark.parametrize("words", ["yes?", "ok?", "ok \U0001F44D", "\U0001F44D", "please", "please.", "Please!",
+                                   "yes; go ahead", "yes - go ahead", "ok :)", "yes...?", "yes (go ahead)"])
+def test_only_a_plain_yes_with_plain_punctuation_counts(mcp_crm, words):
+    p = propose(mcp_crm)
+    with pytest.raises(CRMError) as caught:
+        mcp_crm.commit_write("claude", p["write_id"], p["payload_hash"], words)
+    assert caught.value.code in ("not_a_yes", "needs_confirm") and mcp_crm.writes["W-1"]["status"] == "pending"
+
+
+@pytest.mark.parametrize("words", ["Yes, please!", "please, go ahead", "OK.", "that’s right, save it", "yes yes"])
+def test_a_plain_yes_with_please_or_punctuation_counts(mcp_crm, words):
+    p = propose(mcp_crm)
+    mcp_crm.commit_write("claude", p["write_id"], p["payload_hash"], words)
+    assert mcp_crm.writes["W-1"]["status"] == "committed"

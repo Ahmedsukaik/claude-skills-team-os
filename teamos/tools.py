@@ -18,12 +18,15 @@ from typing import Any
 
 from crm import CRM, CRMError
 from crm.store import OPS
-from crm.timestamps import read_stated_time, relative_near
+from crm.timestamps import lead_word, read_stated_time, relative_near
 
 from .skills import SkillError, SkillLibrary, default_library
 
 HOUSE_RULES = "house-rules"
 STR = {"type": "string"}
+LEAD = re.compile(r"by ")
+WRITE_ACTIONS = {"propose_write": "propose write", "commit_write": "save", "discard_write": "discard",
+                 "create_email_draft": "draft email"}
 
 
 def _tool(name: str, description: str, properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
@@ -124,22 +127,26 @@ def _norm(text: str) -> str:
 
 def time_check(words: str, broker_words: list[str]) -> str | None:
     """None when `words` are the broker's own words for a time; otherwise why not. A date cut out
-    of a relative phrase ("two weeks after Friday, October 23, 2026") is not their words either."""
+    of a longer phrase is not their words either: not from a relative phrase ("two weeks after
+    the tour, which is Friday, October 23, 2026"), and not without its leading "by" ("by Friday"
+    is a deadline, so the cut must keep the "by"). A plain "on" or "due" may be left out."""
     phrase = _norm(words)
     if not phrase:
         return "empty"
-    exact = read_stated_time(words).value is not None  # only a date can be cut out of a relative phrase
-    inside: str | None = None
+    exact = read_stated_time(words).value is not None  # only a date can be cut out of a longer phrase
+    why: str | None = None
     for said in broker_words:
         text = f" {_norm(said)} "
         start = text.find(f" {phrase} ")
         while start != -1:
-            near = relative_near(text, start + 1, start + 1 + len(phrase)) if exact else None
-            if near is None:
+            begin = start + 1
+            near = relative_near(text, begin, begin + len(phrase)) if exact else None
+            lead = lead_word(text, begin) if exact and not LEAD.match(phrase) else None
+            if near is None and lead is None:
                 return None
-            inside = inside or near
+            why = why or (f"part of a relative phrase ('{near} ...')" if near else f"missing its leading '{lead}'")
             start = text.find(f" {phrase} ", start + 1)
-    return f"part of a relative phrase ('{inside} ...')" if inside else "not said"
+    return why or "not said"
 
 
 def _ok(data: Any, label: str, **extra: Any) -> ToolResult:
@@ -164,6 +171,9 @@ def run_tool(ctx: ToolContext, name: str, data: Any) -> ToolResult:
     except SkillError as e:
         return _err("skill", str(e), "A skill file was not found")
     except (TypeError, ValueError, KeyError) as e:
+        if name in WRITE_ACTIONS:  # a malformed write is a refusal like any other, so it goes in the log
+            ctx.crm.write_log(ctx.actor, WRITE_ACTIONS[name], f"Refused: the input was malformed ({type(e).__name__}). "
+                                                              "Nothing was changed.", "refused")
         return _err("invalid", f"Bad input for {name}: {type(e).__name__}.", "A step was refused")
 
 

@@ -30,7 +30,7 @@ from typing import Any
 from . import data
 from .confirm import ConfirmPolicy
 from .errors import CRMError
-from .text import mixed_script, strip_control, words
+from .text import has_letter_or_digit, mixed_script, name_key, strip_control, words
 from .timestamps import nice, read_stated_time
 
 WRITE_TTL = timedelta(minutes=30)
@@ -50,6 +50,8 @@ OPS: dict[str, tuple[set[str], set[str]]] = {   # op: (required, optional)
 LIST_FIELDS = {"discussed", "next_steps"}
 EMAIL = re.compile(r"^[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$")
 WORDS_DROPPED = {"the", "a", "an", "of", "and", "for", "with", "from", "at", "to", "in", "on", "s", "co", "inc", "llc"}
+# Words that do not make a company different: "Acme", "Acme Inc" and "Acme Group" are one company.
+COMPANY_SUFFIXES = {"ltd", "corp", "corporation", "company", "group", "limited", "plc", "llp", "gmbh", "inc", "llc", "co"}
 ID = re.compile(r"^(?:C|CO|D|P|N|T|E|W|M)-\d{1,5}$")
 KINDS = {"C": "contact", "CO": "company", "D": "deal", "P": "property", "N": "note", "T": "task", "E": "event", "M": "draft"}
 
@@ -64,6 +66,11 @@ def iso(moment: datetime) -> str:
 
 def tokens(text: str) -> list[str]:
     return [t for t in words(text) if t not in WORDS_DROPPED]
+
+
+def company_key(name: str) -> str:
+    """A company name as one run of letters and digits, without "Inc", "Group" and the like."""
+    return "".join(t for t in tokens(name) if t not in COMPANY_SUFFIXES)
 
 
 def payload_hash(summary: str, changes: list[dict[str, Any]]) -> str:
@@ -415,7 +422,7 @@ class CRM:
         if not isinstance(raw, dict):
             raise CRMError("invalid", "Each change must be an object with an op.")
         op = raw.get("op")
-        if op not in OPS:
+        if not isinstance(op, str) or op not in OPS:
             raise CRMError("invalid", f"Unknown op {op!r}. Use one of: {', '.join(OPS)}.")
         required, optional = OPS[op]
         out: dict[str, Any] = {"op": op}
@@ -434,13 +441,14 @@ class CRM:
                     out[key] = items
             else:
                 cleaned = _text(value, key, LIMITS.get(key, 40))
-                if cleaned:
+                if cleaned and (key not in required or has_letter_or_digit(cleaned)):
                     out[key] = cleaned
         if extra:
             raise CRMError("invalid", f"{op} does not take {', '.join(extra)}.")
         missing = sorted(required - set(out))
         if missing:
-            raise CRMError("invalid", f"{op} needs {', '.join(missing)} (an empty value does not count).")
+            raise CRMError("invalid", f"{op} needs {', '.join(missing)} (an empty value, or one with no letter or digit, "
+                                      "does not count).")
         return out
 
     def _normalize(self, c: dict[str, Any]) -> dict[str, Any]:
@@ -498,12 +506,17 @@ class CRM:
                 raise CRMError("no_change", f"{contact['name']} already has those details.")
         elif op == "create_company":
             _one_alphabet(c["name"])
-            key = " ".join(tokens(c["name"]))
-            match = next((co for co in self.companies.values() if key and " ".join(tokens(co["name"])) == key), None)
+            key = company_key(c["name"])
+            match = next((co for co in self.companies.values() if key and company_key(co["name"]) == key), None)
             if match:
                 raise CRMError("duplicate_company", f"{match['name']} is already in the CRM as {match['id']}.",
                                outcome="blocked", plain=f"{match['name']} is already in the CRM. Nothing new was created.",
                                match=self._brief("company", match))
+            # "Quillon" and "Quillon Logistics": maybe the same company. Not blocked, but flagged on the card.
+            near = [co for co in self.companies.values() if len(key) >= 4 and len(company_key(co["name"])) >= 4
+                    and (company_key(co["name"]).startswith(key) or key.startswith(company_key(co["name"])))]
+            if near:
+                out["similar_to"] = ", ".join(f"{co['name']} ({co['id']})" for co in near[:3])
         elif op == "update_deal_stage":
             deal = self._need(c["deal_id"], "D", "deal_id")
             stage = next((s for s in data.STAGES if s.lower() == c["stage"].lower()), None)
@@ -517,12 +530,11 @@ class CRM:
         return out
 
     def _duplicate_contact(self, email: str, first: str, last: str, company_id: str) -> dict[str, Any] | None:
-        name = (" ".join(words(first)), " ".join(words(last)))
+        name = (name_key(first), name_key(last))   # letters and digits only: "Da-na" is "Dana"
         for x in self.contacts.values():
             if x["email"] == email:
                 return x
-            if all(name) and (" ".join(words(x["first_name"])), " ".join(words(x["last_name"]))) == name \
-                    and x["company_id"] == company_id:
+            if all(name) and (name_key(x["first_name"]), name_key(x["last_name"])) == name and x["company_id"] == company_id:
                 return x
         return None
 
@@ -603,7 +615,8 @@ class CRM:
                     [k.replace("_", " ").capitalize(), f"{c['before'][k] or 'none'} -> {c[k]}"] for k in c["before"]]
             elif op == "create_company":
                 item["heading"] = "New company"
-                item["rows"] = [["Name", c["name"]]] + ([["Industry", c["industry"]]] if c.get("industry") else [])
+                item["rows"] = [["Name", c["name"]]] + ([["Industry", c["industry"]]] if c.get("industry") else []) + \
+                    ([["Looks like", c["similar_to"]]] if c.get("similar_to") else [])
             else:
                 item["heading"] = "Deal stage"
                 deal = self.deals[c["deal_id"]]
@@ -644,6 +657,8 @@ def _flags(changes: list[dict[str, Any]]) -> list[str]:
     """Everything the person should check: a time kept as words, and a date that looks odd."""
     flags = []
     for c in changes:
+        if c.get("similar_to"):
+            flags.append(f"'{c['name']}' looks like {c['similar_to']}, already in the CRM. Check it is not the same company.")
         for prefix in ("stated_time", "due"):
             for kind in ("note", "warning"):
                 said = c.get(f"{prefix}_{kind}")

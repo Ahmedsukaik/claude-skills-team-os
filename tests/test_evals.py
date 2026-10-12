@@ -84,3 +84,10 @@ def test_the_consistency_judge_compares_fields_not_prose():
     assert judge_consistency(case, same, "guided") == [] and structured(same[0])[0][-1] == "last week"
     different = same[:2] + [view_with([], pending=pending("Coffee", "C-11"))]
     assert judge_consistency(case, different, "guided")[0].startswith("B-3 got different fields")
+
+
+
+def test_stated_words_match_with_or_without_a_plain_on_or_due():
+    from evals.__main__ import same_words
+    assert same_words("on October 30, 2026", "October 30, 2026") and same_words("Due October 30, 2026", "October 30, 2026")
+    assert not same_words("by October 30, 2026", "October 30, 2026")   # "by" makes a deadline

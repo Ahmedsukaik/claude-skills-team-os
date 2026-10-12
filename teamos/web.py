@@ -142,10 +142,37 @@ def live_model_from_env() -> ClaudeModel | None:
     return ClaudeModel()
 
 
+# The same headers vercel.json sets on the deployed site (a test keeps the two equal), so the page is
+# tested locally under the Content-Security-Policy it gets in production.
+SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'none'; "
+        "form-action 'self'"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Frame-Options": "DENY",
+}
+
+
 def create_app(agent: Agent | None = None, serve_static: bool = True) -> FastAPI:
     app = FastAPI(title=f"{crm_data.FIRM} team assistant (demo)", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.agent = agent if agent is not None else Agent(live=live_model_from_env())
     app.state.limiter = Limiter()
+
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next: Any) -> Any:
+        response = await call_next(request)
+        for key, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(key, value)
+        return response
 
     def visitor(request: Request) -> str:
         """The visitor's address. Behind Vercel, its own headers carry the real client; anywhere

@@ -13,7 +13,7 @@ from teamos.models import ModelUnavailable, Turn
 from teamos.prompts import SYSTEM_PROMPT
 
 NOTE = story_texts()["voice_note"]
-FOLLOW_UP = NOTE.split("on ")[-1].rstrip(".")
+FOLLOW_UP = "on " + NOTE.split(" on ")[-1].rstrip(".")  # with its "on": a cut date keeps its leading word
 CHANGES = [{"op": "create_note", "contact_id": "C-5", "deal_id": "D-3", "property_id": "P-5",
             "summary": "Tour of 310 Canal Street with Marcus Bell", "discussed": ["Liked the loading dock"],
             "stated_time_text": "yesterday afternoon"},
@@ -265,3 +265,61 @@ def test_failed_live_calls_are_logged_without_secrets(caplog):
     logged = " ".join(r.getMessage() for r in caplog.records)
     assert "kind=invalid" in logged and "status=400" in logged and "req_local_123" in logged
     assert "SECRET-PROMPT-TEXT" not in logged and "sk-" not in logged
+
+
+@pytest.mark.parametrize("said, cut, why", [
+    ("Send Ravi the plans by Friday, October 23, 2026.", "Friday, October 23, 2026", "missing its leading 'by'"),
+    ("Follow up two weeks after the tour, which is Friday, October 23, 2026.", "Friday, October 23, 2026",
+     "part of a relative phrase"),
+    ("Sign it no later than October 30, 2026.", "October 30, 2026", "part of a relative phrase"),
+])
+def test_a_date_cut_out_of_a_longer_phrase_is_not_the_broker_words(said, cut, why):
+    from teamos.tools import time_check
+    assert why in (time_check(cut, [said]) or "")
+
+
+def test_a_date_with_its_leading_word_is_the_broker_words_and_by_keeps_its_flag():
+    from crm import CRM, StatedConfirm
+    from teamos.tools import time_check
+    said = "Send Ravi the plans by Friday, October 23, 2026."
+    assert time_check("by Friday, October 23, 2026", [said]) is None
+    assert time_check("Friday, October 23, 2026", ["Follow up with Ravi Menon, Friday, October 23, 2026."]) is None
+    assert time_check("October 30, 2026", ["Follow up on October 30, 2026."]) is None   # a plain "on" may go
+    assert time_check("October 30, 2026", ["The lease is due October 30, 2026."]) is None
+    assert "relative phrase" in time_check("October 30, 2026", ["Sign it before October 30, 2026."])
+    from datetime import date
+    crm = CRM.new(date(2026, 10, 12), StatedConfirm())
+    p = crm.propose_write("assistant", "x", [{"op": "create_task", "title": "Send the plans",
+                                              "due_text": "by Friday, October 23, 2026"}])
+    assert p["changes"][0]["due"] == "2026-10-23" and "deadline" in p["changes"][0]["due_warning"]
+
+
+NESTED = [{"op": "create_note", "contact_id": "C-5", "summary": "x", "discussed": [[[["a"]]]]}]
+
+
+@pytest.mark.parametrize("bad", [
+    {"summary": "x", "changes": NESTED},
+    {"summary": {"nested": {"deeper": ["x"]}}, "changes": []},
+    {"summary": "x", "changes": ["not an object"]},
+    {"summary": "x", "changes": [{"op": "create_note", "contact_id": {"id": "C-5"}}]},
+])
+def test_a_tool_input_of_the_wrong_shape_is_answered_by_the_fixed_rules(bad):
+    model = ScriptedModel([tool(1, "load_skill", name="house-rules"), tool(2, "propose_write", **bad)])
+    chat = Chat(Agent(live=model))
+    chat.say(NOTE)
+    assert NOTES["invalid"] in [t.get("text") for t in chat.view["transcript"] if t["kind"] == "system"]
+    assert not any(c["op"] == "create_note" and c.get("summary") == "x" for p in chat.view["pending"] for c in p["changes"])
+    chat.say("What can you do?")   # the chat goes on: nothing nested was signed into it
+    assert chat.reply()["text"] == "Anything else?" and len(chat.replies()) == 2
+
+
+def test_a_malformed_write_is_refused_and_logged():
+    from datetime import date
+
+    from crm import CRM, ButtonConfirm
+    from teamos.skills import default_library
+    from teamos.tools import ToolContext, run_tool
+    crm = CRM.new(date(2026, 10, 12), ButtonConfirm(b"k" * 32))
+    result = run_tool(ToolContext(crm, default_library(), "Claude for Priya Natarajan", {"house-rules"}), "propose_write",
+                      {"summary": 5, "changes": []})
+    assert result.is_error and crm.log[-1]["outcome"] == "refused" and "malformed" in crm.log[-1]["detail"]

@@ -23,9 +23,11 @@ from typing import Any, Protocol
 
 from .errors import CRMError
 
-# The whole reply, and nothing but these phrases (with punctuation and spaces between them).
-PLAIN_YES = re.compile(r"^\W*(?:(?:please|yes|yep|yeah|confirm(?:ed)?|go ahead|save it|do it|correct|looks (?:good|right)|"
-                       r"that'?s right|ok(?:ay)?)\W*)+$", re.I)
+# The whole reply, and nothing but these phrases, with only spaces and . , ! between them. No
+# question mark ("yes?" is a question), no emoji, and "please" on its own is not a yes.
+_YES = r"yes|yep|yeah|confirm(?:ed)?|go ahead|save it|do it|correct|looks (?:good|right)|that['’]?s right|ok(?:ay)?"
+PLAIN_YES = re.compile(r"^[\s.,!]*(?:(?:please|" + _YES + r")(?:[\s.,!]+|$))+$", re.I)
+HAS_YES = re.compile(r"\b(?:" + _YES + r")\b", re.I)
 NOT_YES = re.compile(r"\b(?:no|not|nope|don'?t|do not|wait|hold on|cancel|stop|later|first|but|change|instead)\b", re.I)
 LOGGED_WORDS = 300
 
@@ -70,7 +72,7 @@ class StatedConfirm:
             raise CRMError("needs_confirm", "A commit needs the person's own words of confirmation (user_confirmation), "
                                             "given after they saw the read back. Nothing was saved.",
                            plain="No words of confirmation were given. Nothing was saved.")
-        if NOT_YES.search(words) or not PLAIN_YES.match(words):
+        if NOT_YES.search(words) or not PLAIN_YES.match(words) or not HAS_YES.search(words):
             raise CRMError("not_a_yes", f'"{shown}" is not a plain yes to this read back. Nothing was saved. Read the write '
                                         "back again and ask for an explicit yes.",
                            plain=f'"{shown}" is not a plain yes. Nothing was saved.')

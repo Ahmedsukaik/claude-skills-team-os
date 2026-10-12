@@ -52,11 +52,18 @@ NUMERIC_NOTE = "Written in numbers only, so the order of day and month is not ce
 WEEKDAY_NOTE = "The weekday does not match the date: kept as the person's words. Check it with them."
 BY_WARNING = "Said with 'by': a deadline. The date is the latest day, not an agreed day."
 # Words that make a nearby date relative ("two weeks after", "not before", "around"): a date cut out
-# of such a phrase is not what the person said.
-RELATIVE = re.compile(r"\b(?:after|before|until|till|not|around|about|approximately|roughly|circa|within|from|since|past|than|"
-                      r"\d+\s+(?:days?|weeks?|months?)|(?:a|one|two|three|four|five|six|a few|a couple of|couple of)\s+"
-                      r"(?:days?|weeks?|months?))\b", re.I)
-RELATIVE_AFTER = re.compile(r"^(?:or so|or later|or earlier|at the latest|at the earliest|give or take)\b", re.I)
+# of such a phrase is not what the person said. NEAR words count only just before the date ("from
+# Friday ..."); CLAUSE cues count anywhere earlier in the same sentence ("two weeks after the tour,
+# which is Friday, ..."), so they are the ones that are never part of a plain date.
+_COUNT = (r"\d+\s+(?:days?|weeks?|months?)|(?:a|one|two|three|four|five|six|a few|a couple of|couple of)\s+"
+          r"(?:days?|weeks?|months?)")
+_CLAUSE = (r"after|before|until|till|within|prior to|ahead of|following(?!\s+up)|plus|no later than|if not sooner|"
+           + _COUNT)
+RELATIVE = re.compile(r"\b(?:" + _CLAUSE + r"|not|around|about|approximately|roughly|circa|from|since|past|than)\b", re.I)
+CLAUSE_CUES = re.compile(r"\b(?:" + _CLAUSE + r")\b", re.I)
+RELATIVE_AFTER = re.compile(r"^(?:or so|or later|or earlier|or sooner|if not sooner|plus|at the latest|at the earliest|give or take)\b",
+                            re.I)
+DEADLINE_WORD = re.compile(r"\b(by)\s*$", re.I)
 INVALID_NOTE = "Not a real date or time: kept as the person's words."
 
 
@@ -79,13 +86,23 @@ class StatedTime:
 
 
 def relative_near(text: str, start: int, end: int) -> str | None:
-    """The relative words right before or after text[start:end], if any. "two weeks after Friday,
+    """The relative words around text[start:end], if any: a near word just before it, a cue
+    anywhere earlier in the same sentence, or a word just after it. "two weeks after Friday,
     October 23, 2026": the date inside is not a time the person gave."""
-    sentence = re.split(r"[.!?;:]\s", text[max(0, start - 60):start])[-1]   # the same sentence only
-    before = " ".join(re.findall(r"[\w']+", sentence)[-4:])                  # the last four words before the date
+    sentence = re.split(r"[.!?;:]\s", text[max(0, start - 240):start])[-1]   # the same sentence only
+    before = " ".join(re.findall(r"[\w']+", sentence)[-4:])                   # the last four words before the date
     after = " ".join(re.findall(r"[\w']+", text[end:end + 30])[:3])
-    m = RELATIVE.search(before) or RELATIVE_AFTER.match(after)
+    m = RELATIVE.search(before) or CLAUSE_CUES.search(sentence) or RELATIVE_AFTER.match(after)
     return m.group(0) if m else None
+
+
+def lead_word(text: str, start: int) -> str | None:
+    """The deadline word "by" right before text[start:], if any: a date cut without it loses what
+    the person meant ("by Friday" is a deadline, not an agreed day). A plain "on" or "due" before a
+    date changes nothing, so it may be left out. Relative words ("before", "after", "no later
+    than") are relative_near's."""
+    m = DEADLINE_WORD.search(text[max(0, start - 12):start])
+    return m.group(1).lower() if m else None
 
 
 def clean(text: str) -> str:

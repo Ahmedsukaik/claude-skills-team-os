@@ -115,7 +115,7 @@ def test_reading_a_note_keeps_words_and_never_dates():
     contact = {"first_name": "Marcus", "last_name": "Bell", "name": "Marcus Bell"}
     d = read_debrief(STORY["voice_note"], contact, "310 Canal Street")
     assert d.stated == "yesterday afternoon" and d.summary == "Tour of 310 Canal Street with Marcus Bell"
-    assert find_time("Follow up on Fri, Oct. 23, 2026 at 3 pm.") == "Fri, Oct. 23, 2026 at 3 pm"
+    assert find_time("Follow up on Fri, Oct. 23, 2026 at 3 pm.") == "Fri, Oct. 23, 2026 at 3 pm"  # a plain "on" may go
     assert find_time("No time here.") is None
     assert sentences("Walked 14 Elm St. He liked it. Meet Oct. 23, 2026.") == ["Walked 14 Elm St.", "He liked it.",
                                                                               "Meet Oct. 23, 2026."]
@@ -148,3 +148,35 @@ def test_a_relative_phrase_stays_whole_in_the_debrief(chat):
     chat.say("Voice note: call with Ravi Menon this morning. Follow up two weeks after Friday, October 23, 2026.")
     task = [c for c in chat.view["pending"][0]["changes"] if c["op"] == "create_task"][-1]
     assert task["due_text"] == "two weeks after Friday, October 23, 2026" and task["due"] is None
+
+
+@pytest.mark.parametrize("text, words", [
+    ("Send the plans by Friday, October 23, 2026.", "by Friday, October 23, 2026"),
+    ("Follow up two weeks after the tour, which is Friday, October 23, 2026.",
+     "two weeks after the tour, which is Friday, October 23, 2026"),
+    ("Call him on October 30, 2026 or so.", "October 30, 2026 or so"),
+])
+def test_the_fixed_rules_cut_a_time_with_everything_that_changes_it(text, words):
+    assert find_time(text) == words
+
+
+@pytest.mark.parametrize("text, name", [
+    ("Add a new contact: Mary-Jane Okoro, mj.okoro@example.com, at Kilnworth Brewing.", ("Mary-Jane", "Okoro")),
+    ("Add a new contact: Dána O'Neill, dana.oneill@example.com, at Kilnworth Brewing.", ("Dána", "O'Neill")),
+    ("Add a new contact: محمد علي, m.ali@example.com, at Kilnworth Brewing.",
+     ("محمد", "علي")),
+])
+def test_the_fixed_rules_read_names_in_any_alphabet(chat, text, name):
+    chat.say(text)
+    change = chat.view["pending"][0]["changes"][0]
+    assert (change["first_name"], change["last_name"]) == name
+
+
+def test_the_fixed_rules_never_take_a_name_from_the_email(chat):
+    chat.say("Add a new contact: nora.quist@example.com, Nora Quist at Kilnworth Brewing.")
+    assert chat.reply()["text"] == "What is the new contact's full name?" and not chat.view["pending"]
+
+
+def test_the_fixed_rules_ask_when_the_name_is_a_company(chat):
+    chat.say("Add a new contact: Quillon Logistics, ops@example.com, at Quillon Logistics.")
+    assert "is the name of a company" in chat.reply()["text"] and not chat.view["pending"]

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from crm import data as crm_data
-from crm.timestamps import nice, relative_near
+from crm.timestamps import lead_word, nice, relative_near
 
 from .models import Turn
 
@@ -176,11 +176,19 @@ def find_time(text: str) -> str | None:
     ("two weeks after Friday, October 23, 2026") comes with the phrase, so it stays words."""
     m = EXACT_TIME.search(text)
     if m:
-        near = relative_near(text, m.start(), m.end())
+        begin, end = m.start(), m.end()
+        near = relative_near(text, begin, end)
         if near:
-            begin = text.lower().rfind(near.split()[0].lower(), 0, m.start())
-            return text[max(begin, 0):m.end()].strip(" ,.")
-        return m.group(0).strip(" ,.")
+            follows = re.match(r"[\s,]*" + re.escape(near), text[end:], re.I)
+            if follows:   # "on Friday, October 23, 2026 or so": the words after it come too
+                end += follows.end()
+            else:         # "two weeks after the tour, which is Friday, ...": from the first relative word
+                hits = [x.start() for x in re.finditer(r"\b" + re.escape(near.split()[0]) + r"\b", text[:begin], re.I)]
+                begin = hits[-1] if hits else begin
+        lead = lead_word(text, begin)
+        if lead:      # "by Friday, ..." keeps its "by": a deadline is not an agreed day; "on" may go
+            begin = text.lower().rfind(lead, 0, begin)
+        return text[begin:end].strip(" ,.")
     m = VAGUE_TIME.search(text)
     return m.group(0).strip(" ,.") if m else None
 
@@ -232,7 +240,7 @@ def read_debrief(text: str, contact: dict[str, Any], property_address: str | Non
                     tasks.append((re.sub(r"\b(?:him|her)\b", first, item), find_time(item)))
             continue
         when = find_time(s)
-        names_it = re.search(rf"\b(?:{first}|{contact['last_name']})\b", s)
+        names_it = re.search(rf"\b(?:{re.escape(first)}|{re.escape(contact['last_name'])})\b", s)
         if when and stated is None:
             stated = when
             if names_it:
@@ -574,17 +582,39 @@ def _update(chat: Chat, request: str, answer: str | None) -> list[dict[str, Any]
     return [chat.call("propose_write", summary=f"Move {deals[0]['name']} to {stage}", changes=[change])]
 
 
+# A name word in any alphabet: "Nora", "Mary-Jane", "O'Neill", "Dána", or a caseless script.
+NAME_WORD = re.compile(r"[^\W\d_]+(?:[-'’][^\W\d_]+)*")
+
+
+def _is_name_word(word: str) -> bool:
+    first = word[0]
+    return first.isupper() or first.lower() == first.upper()   # capitalised, or a script without case
+
+
+def person_name(text: str) -> tuple[str, str] | None:
+    """The first two name words next to each other, as (first, last), from text that holds no email."""
+    found = list(NAME_WORD.finditer(text))
+    for a, b in zip(found, found[1:], strict=False):
+        if text[a.end():b.start()].strip() == "" and _is_name_word(a.group(0)) and _is_name_word(b.group(0)):
+            return a.group(0), b.group(0)
+    return None
+
+
 def _add_contact(chat: Chat, request: str) -> list[dict[str, Any]]:
-    full = re.search(r"\b([A-Z][a-z]+)\s+([A-Z][a-z]+)\b", ADD_LEAD.sub("", request, count=1))
     email = EMAIL_ADDR.search(request)
+    before = request[:email.start()] if email else request   # the name comes before the email, never from it
+    parts = person_name(ADD_LEAD.sub("", before, count=1))
     companies = company_mentions(request)
-    if not full:
+    if not parts:
         return [_text("What is the new contact's full name?")]
+    name = " ".join(parts)
+    if company_mentions(name) or name.lower() in {n.lower() for n in COMPANY_NAMES.values()}:
+        return [_text(f"{name} is the name of a company in the CRM. What is the new contact's own full name?")]
     if not email:
-        return [_text(f"What is {full.group(0)}'s email address? I won't make one up.")]
+        return [_text(f"What is {name}'s email address? I won't make one up.")]
     if not companies:
-        return [_text(f"Which company is {full.group(0)} at?")]
-    name, address, company = full.group(0), email.group(0).lower(), companies[0]
+        return [_text(f"Which company is {name} at?")]
+    address, company = email.group(0).lower(), companies[0]
     if not chat.done("search_crm"):
         return [chat.call("search_crm", query=address), chat.call("search_crm", query=name)]
     for _, d, _ in chat.done("search_crm"):
@@ -593,7 +623,7 @@ def _add_contact(chat: Chat, request: str) -> list[dict[str, Any]]:
                 return [_text(f"{r['name']} is already in the CRM ({r['company']}, {r['email']}), so I haven't added a new "
                               "contact. Do you want to update that one instead?")]
     return [chat.call("propose_write", summary=f"Add {name} as a contact", changes=[
-        {"op": "create_contact", "first_name": full.group(1), "last_name": full.group(2), "email": address, "company_id": company}])]
+        {"op": "create_contact", "first_name": parts[0], "last_name": parts[1], "email": address, "company_id": company}])]
 
 
 def _add_company(chat: Chat, request: str) -> list[dict[str, Any]]:

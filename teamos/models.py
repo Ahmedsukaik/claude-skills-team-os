@@ -82,7 +82,9 @@ class ClaudeModel:
         self.effort = (effort or os.environ.get("TEAMOS_CLAUDE_EFFORT") or "low").lower()
         if self.effort not in EFFORTS:
             raise ValueError(f"TEAMOS_CLAUDE_EFFORT must be one of {', '.join(EFFORTS)}")
-        strict_env = os.environ.get("TEAMOS_STRICT_TOOLS", "on").lower() not in ("off", "0", "false", "no")
+        # Off by default: with this many tools, strict schemas made live calls take longer than the 20 second
+        # request timeout. run_tool and the session check every tool input themselves.
+        strict_env = os.environ.get("TEAMOS_STRICT_TOOLS", "off").lower() in ("on", "1", "true", "yes")
         self.strict_tools = strict_env if strict_tools is None else strict_tools
         self.max_tokens = max_tokens
         if client is None:

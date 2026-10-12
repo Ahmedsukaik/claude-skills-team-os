@@ -266,3 +266,35 @@ def test_vercel_routes_the_health_check_to_the_app():
     from pathlib import Path
     config = json.loads((Path(__file__).resolve().parent.parent / "vercel.json").read_text(encoding="utf-8"))
     assert {"source": "/healthz", "destination": "/api/index"} in config["rewrites"]
+
+
+def test_a_nested_tool_input_does_not_break_the_chat_over_http():
+    from conftest import ScriptedModel, tool
+
+    from teamos.agent import Agent
+    from teamos.web import create_app
+    nested = [{"op": "create_note", "contact_id": "C-5", "summary": "x", "discussed": [[[["a"]]]]}]
+    model = ScriptedModel([tool(1, "load_skill", name="house-rules"), tool(2, "propose_write", summary="x", changes=nested)])
+    client = TestClient(create_app(Agent(live=model)))
+    out = client.post("/api/new", json={}).json()
+    out = send(client, out["session"], {"type": "broker", "text": "Log my call with Ravi Menon just now."})
+    while out["more"]:
+        out = send(client, out["session"], {"type": "continue"})
+    out = send(client, out["session"], {"type": "broker", "text": "What can you do?"})
+    while out["more"]:
+        out = send(client, out["session"], {"type": "continue"})
+    assert out["view"]["transcript"][-1]["kind"] == "assistant"
+
+
+def test_the_page_gets_the_same_security_headers_here_as_on_vercel(client):
+    import json
+    from pathlib import Path
+
+    from teamos.web import SECURITY_HEADERS
+    config = json.loads((Path(__file__).resolve().parent.parent / "vercel.json").read_text(encoding="utf-8"))
+    on_vercel = {h["key"]: h["value"] for h in config["headers"][0]["headers"]}
+    assert config["headers"][0]["source"] == "/(.*)" and on_vercel == SECURITY_HEADERS
+    csp = SECURITY_HEADERS["Content-Security-Policy"]
+    assert "script-src 'self';" in csp and "frame-ancestors 'none'" in csp and "unsafe-eval" not in csp
+    for path in ("/", "/app.js", "/api/config"):
+        assert client.get(path).headers["content-security-policy"] == csp

@@ -92,7 +92,7 @@ PROPOSE = [{"type": "broker", "text": "Follow up with Ravi on October 30, 2026",
            {"type": "assistant", "at": AT, "content": [
                tool(1, "load_skill", name="house-rules"),
                tool(2, "propose_write", summary="x", changes=[{"op": "create_task", "title": "Call Ravi",
-                                                              "due_text": "October 30, 2026"}])]}]
+                                                              "due_text": "on October 30, 2026"}])]}]
 
 
 def card_hash() -> str:

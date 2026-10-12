@@ -25,6 +25,14 @@ def snapshot(crm: CRM):
 
 
 # ------------------------------------------------------------------ two step writes
+def test_a_note_on_a_deal_takes_the_deals_property_whoever_asks(crm):
+    without = {k: v for k, v in NOTE.items() if k != "property_id"}
+    assert propose(crm, without)["changes"][0]["property_id"] == "P-5"
+    assert propose(crm, dict(NOTE))["changes"][0]["property_id"] == "P-5"
+    with pytest.raises(CRMError, match="is at 310 Canal Street"):
+        propose(crm, dict(NOTE, property_id="P-1"))
+
+
 def test_proposing_changes_nothing_and_returns_a_preview(crm):
     before = snapshot(crm)
     p = propose(crm)
@@ -220,7 +228,8 @@ def test_a_write_is_all_or_nothing(crm):
 
 def test_empty_values_count_as_not_given_and_text_is_cleaned(crm):
     p = propose(crm, {**NOTE, "property_id": "", "next_steps": [], "summary": "  Tour ​of   310 Canal  "})
-    assert "property_id" not in p["changes"][0] and "next_steps" not in p["changes"][0]
+    assert "next_steps" not in p["changes"][0]
+    assert p["changes"][0]["property_id"] == "P-5"  # an empty property counts as not given, so the deal's is used
     assert p["changes"][0]["summary"] == "Tour of 310 Canal"
 
 

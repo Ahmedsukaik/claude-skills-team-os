@@ -40,7 +40,7 @@ def test_the_request_caches_the_skill_list_and_switches_thinking_off(monkeypatch
     for name in ("TEAMOS_CLAUDE_MODEL", "TEAMOS_CLAUDE_EFFORT", "TEAMOS_STRICT_TOOLS"):
         monkeypatch.delenv(name, raising=False)
     req = model().request(SYSTEM_PROMPT, TOOLS, MESSAGES)
-    assert req["model"] == DEFAULT_MODEL == "claude-haiku-5-5" and req["max_tokens"] == 1500
+    assert req["model"] == DEFAULT_MODEL == "claude-haiku-5-5" and req["max_tokens"] == 3000
     assert req["system"] == [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral", "ttl": "1h"}}]
     assert "<available_skills>" in req["system"][0]["text"]
     assert req["thinking"] == {"type": "disabled"} and req["output_config"] == {"effort": "low"}

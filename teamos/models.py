@@ -73,7 +73,7 @@ class ClaudeModel:
 
     mode = "live"
 
-    def __init__(self, client: Any | None = None, model: str | None = None, max_tokens: int = 1500,
+    def __init__(self, client: Any | None = None, model: str | None = None, max_tokens: int = 3000,
                  effort: str | None = None, strict_tools: bool | None = None):
         self.name = model or os.environ.get("TEAMOS_CLAUDE_MODEL") or DEFAULT_MODEL
         if self.name not in SUPPORTED_MODELS:

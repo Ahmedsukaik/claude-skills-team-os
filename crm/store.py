@@ -467,7 +467,12 @@ class CRM:
                 if deal["company_id"] != company:
                     raise CRMError("invalid", f"{deal['id']} is a {self.companies[deal['company_id']]['name']} deal, not "
                                               f"{self.companies[company]['name']}.")
-            if c.get("property_id"):
+                # The deal already names its property: the code links it, so the note is the same whoever asks.
+                if c.get("property_id") and c["property_id"] != deal["property_id"]:
+                    raise CRMError("invalid", f"{deal['name']} is at {self.properties[deal['property_id']]['name']}, "
+                                              f"not {self._need(c['property_id'], 'P', 'property_id')['name']}.")
+                out["property_id"] = deal["property_id"]
+            elif c.get("property_id"):
                 self._need(c["property_id"], "P", "property_id")
             out.update(read_stated_time(c.get("stated_time_text"), self.today, "past").as_fields("stated_time"))
         elif op == "create_task":

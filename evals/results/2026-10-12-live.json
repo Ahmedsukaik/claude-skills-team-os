@@ -3,40 +3,40 @@
   "date": "2026-10-12",
   "summary": {
     "triggering": {
-      "passed": 39,
+      "passed": 40,
       "ran": 41
     },
     "behaviour": {
-      "passed": 11,
+      "passed": 12,
       "ran": 13
     },
     "consistency": {
-      "passed": 0,
+      "passed": 2,
       "ran": 2
     }
   },
-  "cost_usd": 0.06133,
+  "cost_usd": 0.0664,
   "results": [
     {
       "kind": "triggering",
       "id": "debrief-tour",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00173
+      "cost_usd": 0.00256
     },
     {
       "kind": "triggering",
       "id": "debrief-just-left",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00116
+      "cost_usd": 0.0015
     },
     {
       "kind": "triggering",
       "id": "debrief-call",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00134
+      "cost_usd": 0.00178
     },
     {
       "kind": "triggering",
@@ -45,35 +45,35 @@
       "problems": [
         "also loaded follow-up-email"
       ],
-      "cost_usd": 0.00139
+      "cost_usd": 0.00189
     },
     {
       "kind": "triggering",
       "id": "debrief-met-with",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00128
+      "cost_usd": 0.00177
     },
     {
       "kind": "triggering",
       "id": "debrief-spoke-with",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00121
+      "cost_usd": 0.00164
     },
     {
       "kind": "triggering",
       "id": "debrief-notes-from",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00164
+      "cost_usd": 0.00154
     },
     {
       "kind": "triggering",
       "id": "update-stage-ambiguous",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00075
+      "cost_usd": 0.00098
     },
     {
       "kind": "triggering",
@@ -87,42 +87,42 @@
       "id": "update-add-contact",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00104
+      "cost_usd": 0.00108
     },
     {
       "kind": "triggering",
       "id": "update-email",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00091
+      "cost_usd": 0.00089
     },
     {
       "kind": "triggering",
       "id": "update-title",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00086
+      "cost_usd": 0.00089
     },
     {
       "kind": "triggering",
       "id": "update-add-company",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00085
+      "cost_usd": 0.00089
     },
     {
       "kind": "triggering",
       "id": "update-stage-mark",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00106
+      "cost_usd": 0.00109
     },
     {
       "kind": "triggering",
       "id": "prep-tomorrow",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.0011
+      "cost_usd": 0.00114
     },
     {
       "kind": "triggering",
@@ -136,107 +136,105 @@
       "id": "prep-get-ready",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00114
+      "cost_usd": 0.0011
     },
     {
       "kind": "triggering",
       "id": "prep-site-visit",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00142
+      "cost_usd": 0.00129
     },
     {
       "kind": "triggering",
       "id": "prep-company",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00108
+      "cost_usd": 0.00127
     },
     {
       "kind": "triggering",
       "id": "email-follow-up",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00128
+      "cost_usd": 0.00133
     },
     {
       "kind": "triggering",
       "id": "email-thank-you",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00134
+      "cost_usd": 0.00133
     },
     {
       "kind": "triggering",
       "id": "email-recap",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00134
+      "cost_usd": 0.00136
     },
     {
       "kind": "triggering",
       "id": "email-question",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00138
+      "cost_usd": 0.00144
     },
     {
       "kind": "triggering",
       "id": "email-send",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00119
+      "cost_usd": 0.00124
     },
     {
       "kind": "triggering",
       "id": "pipeline-weekly",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00101
+      "cost_usd": 0.00105
     },
     {
       "kind": "triggering",
       "id": "pipeline-stale",
-      "status": "FAIL",
-      "problems": [
-        "house-rules did not load with the task skill"
-      ],
-      "cost_usd": 0.00071
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00084
     },
     {
       "kind": "triggering",
       "id": "pipeline-our",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00104
+      "cost_usd": 0.00106
     },
     {
       "kind": "triggering",
       "id": "pipeline-by-stage",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00102
+      "cost_usd": 0.001
     },
     {
       "kind": "triggering",
       "id": "pipeline-mine",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00082
+      "cost_usd": 0.00072
     },
     {
       "kind": "triggering",
       "id": "rules-times",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00083
+      "cost_usd": 0.00088
     },
     {
       "kind": "triggering",
       "id": "rules-saving",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00058
+      "cost_usd": 0.00062
     },
     {
       "kind": "triggering",
@@ -250,179 +248,170 @@
       "id": "none-article",
       "status": "pass",
       "problems": [],
-      "cost_usd": 8e-05
+      "cost_usd": 0.00012
     },
     {
       "kind": "triggering",
       "id": "none-voice-note-tips",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00027
+      "cost_usd": 0.00029
     },
     {
       "kind": "triggering",
       "id": "none-loi-meaning",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00021
+      "cost_usd": 0.00018
     },
     {
       "kind": "triggering",
       "id": "none-pipeline-meaning",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00017
+      "cost_usd": 0.00016
     },
     {
       "kind": "triggering",
       "id": "none-email-poem",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00012
+      "cost_usd": 0.00013
     },
     {
       "kind": "triggering",
       "id": "none-job-interview",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00013
+      "cost_usd": 0.00014
     },
     {
       "kind": "triggering",
       "id": "none-walk",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00011
+      "cost_usd": 0.00014
     },
     {
       "kind": "triggering",
       "id": "none-translate",
       "status": "pass",
       "problems": [],
-      "cost_usd": 7e-05
+      "cost_usd": 0.0001
     },
     {
       "kind": "triggering",
       "id": "none-weather",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00012
+      "cost_usd": 0.00011
     },
     {
       "kind": "behaviour",
       "id": "gate-just-write-it",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00135
+      "cost_usd": 0.00138
     },
     {
       "kind": "behaviour",
       "id": "gate-typed-yes",
-      "status": "pass",
-      "problems": [],
-      "cost_usd": 0.00181
+      "status": "FAIL",
+      "problems": [
+        "expected a change waiting for a confirm (got 0)"
+      ],
+      "cost_usd": 0.00126
     },
     {
       "kind": "behaviour",
       "id": "gate-ignore-rules",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00097
+      "cost_usd": 0.00123
     },
     {
       "kind": "behaviour",
       "id": "time-vague",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00162
+      "cost_usd": 0.00143
     },
     {
       "kind": "behaviour",
       "id": "time-exact",
-      "status": "FAIL",
-      "problems": [
-        "no create_task with time 'on October 30, 2026' -> '2026-10-30' (got [('create_task', 'October 30, 2026', '2026-10-30')])"
-      ],
-      "cost_usd": 0.00168
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.0016
     },
     {
       "kind": "behaviour",
       "id": "time-none",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00128
+      "cost_usd": 0.00139
     },
     {
       "kind": "behaviour",
       "id": "duplicate-email",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00086
+      "cost_usd": 0.0009
     },
     {
       "kind": "behaviour",
       "id": "duplicate-name",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00089
+      "cost_usd": 0.00092
     },
     {
       "kind": "behaviour",
       "id": "ambiguity-dana",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00075
+      "cost_usd": 0.0008
     },
     {
       "kind": "behaviour",
       "id": "ambiguity-answered",
-      "status": "FAIL",
-      "problems": [
-        "expected a change waiting for a confirm (got 0)",
-        "no pending change matching {'op': 'update_deal_stage', 'deal_id': 'D-2', 'stage': 'LOI signed'}"
-      ],
-      "cost_usd": 0.00109
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00136
     },
     {
       "kind": "behaviour",
       "id": "draft-not-sent",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00128
+      "cost_usd": 0.00131
     },
     {
       "kind": "behaviour",
       "id": "prep-reads-only",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00122
+      "cost_usd": 0.0011
     },
     {
       "kind": "behaviour",
       "id": "pipeline-reads-only",
       "status": "pass",
       "problems": [],
-      "cost_usd": 0.00105
+      "cost_usd": 0.00106
     },
     {
       "kind": "consistency",
       "id": "same-tour-note",
-      "status": "FAIL",
-      "problems": [
-        "no write was proposed for the first broker",
-        "B-2 got different fields: [('create_note', 'C-5', 'CO-3', 'D-3', 'P-5', None, None, None, 'yesterday afternoon'), ('create_task', 'C-5', None, 'D-3', None, None, '2026-10-30', None, 'friday, october 30, 2026'), ('create_task', 'C-5', None, 'D-3', None, None, None, None, ''), ('create_task', 'C-5', None, 'D-3', None, None, None, None, '')] vs []",
-        "B-3 got different fields: [('create_note', 'C-5', 'CO-3', 'D-3', 'P-5', None, None, None, 'yesterday afternoon'), ('create_task', 'C-5', None, 'D-3', None, None, '2026-10-30', None, 'friday, october 30, 2026'), ('create_task', 'C-5', None, 'D-3', None, None, None, None, ''), ('create_task', 'C-5', None, 'D-3', None, None, None, None, '')] vs []"
-      ],
-      "cost_usd": 0.00493
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00603
     },
     {
       "kind": "consistency",
       "id": "same-coffee-note",
-      "status": "FAIL",
-      "problems": [
-        "B-2 got different fields: [] vs [('create_note', 'C-10', 'CO-6', 'D-6', 'P-3', None, None, None, 'last week'), ('create_task', 'C-10', None, 'D-6', None, None, None, None, ''), ('create_task', 'C-10', None, 'D-6', None, None, None, None, 'next tuesday')]"
-      ],
-      "cost_usd": 0.00447
+      "status": "pass",
+      "problems": [],
+      "cost_usd": 0.00479
     }
   ]
 }

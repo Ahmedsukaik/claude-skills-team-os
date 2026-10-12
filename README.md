@@ -15,9 +15,10 @@ rules. Claude reads every change back, nothing is saved without a yes, and times
 
 - The rules that must never break are in code, not only in the prompt: in the demo only the
   broker's Confirm button can save, and the CRM refuses every other save.
-- 504 automated tests, including the page in a real browser at five screen sizes.
+- 505 automated tests, including the page in a real browser at five screen sizes.
 - 60 evaluation chats: 41 triggering cases, 13 behaviour cases and the same notes from three
-  brokers.
+  brokers. With Claude Haiku 5.5 through the live demo, the latest run passed 54 of the 56 cases,
+  and every run is listed below with what changed after it.
 - It works in Claude Code and Claude Desktop through the MCP server in this repository.
 
 A reference build on a fictional brokerage, Marrowby Commercial. Every person, deal and email is
@@ -32,7 +33,7 @@ made up; it is not a client project and makes no claims about results.
 | `mcp_server/` | the CRM's tools as an MCP server, so the skills run in Claude Code or Claude Desktop against the fake CRM |
 | `teamos/` + `public/` | the web demo: a broker's Claude chat on the left, the CRM on the right |
 | `evals/` | 41 triggering cases, 13 behaviour cases, and a consistency check across three brokers |
-| `tests/` | 504 tests, including the page in a real browser at five screen sizes |
+| `tests/` | 505 tests, including the page in a real browser at five screen sizes |
 | `docs/USER_GUIDE.md` | for the brokers |
 
 ## The six skills
@@ -300,7 +301,7 @@ would wrap HubSpot, the calendar and Gmail drafts, and the rest stays.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest -q          # 504 tests
+python -m pytest -q          # 505 tests
 ruff check . && mypy && mypy .   # all clean
 python -m evals              # the evaluation with the fixed rules (no AI, no cost)
 python -m evals --url URL    # the same cases through a deployed demo, 45 seconds apart
@@ -340,12 +341,31 @@ The **evaluation** has three kinds of cases:
 | Run | Triggering | Behaviour | Consistency |
 |---|---|---|---|
 | Fixed rules (no AI), local, 12 Oct 2026 | 41 of 41 | 13 of 13 | 2 of 2 |
-| Claude Haiku 5.5, through the live demo (effort low, strict tools off) | run in progress | | |
+| Claude Haiku 5.5, through the live demo (effort low, strict tools off), 12 Oct 2026, run 4 | 40 of 41 | 12 of 13 | 2 of 2 |
 
 The fixed rules pass because they were written for these cases. The cases test the skill
-descriptions only when a live model answers, so the live row is the one that matters; its run
-through the live demo is in progress. A reply that fell back to the fixed rules counts as a
-failure. Before a rollout, run them with Claude Sonnet and Claude Opus as
+descriptions only when a live model answers, so the live row is the one that matters. A reply
+that fell back to the fixed rules counts as a failure. All 60 chats of a live run cost about
+$0.06 together. Results: `evals/results/2026-10-12-live.json` (run 4) and
+`evals/results/2026-10-12-live-run3.json` (run 3).
+
+The two misses in run 4: a voice note that ended "I need to send her the expansion plan" also
+loaded `follow-up-email` (the debrief itself was right, and nothing was drafted or sent), and in
+one chat the debrief was never proposed, so a typed "yes, save it" had nothing to wait on
+(nothing was saved, which is the safe side).
+
+How the live numbers got there, so you can judge the method:
+
+| Live run | Triggering | Behaviour | Consistency | What changed after it |
+|---|---|---|---|---|
+| 1 | 39 of 41 | 11 of 13 | 0 of 2 | replies no longer show record ids or repeat the card; the read back must be the proposal itself; an exact field list per change |
+| 2 | 37 of 41 | 13 of 13 | 0 of 2 | a note linked to a deal takes the deal's property in code, so it no longer depends on who asks; a longer reply budget |
+| 3 | 36 of 41 | 13 of 13 | 2 of 2 | read only skills often ran without house-rules: each task skill's description now ends "Always load it together with house-rules." |
+| 4 | 40 of 41 | 12 of 13 | 2 of 2 | (current) |
+
+A model's answers vary from run to run, so expect a case or two to move between runs; the rules
+that must not break (no save without the broker's Confirm, no guessed dates, no duplicates) are
+enforced in code and held in every run. Before a rollout, run them with Claude Sonnet and Claude Opus as
 well as Haiku, because a team may use any of them, and again after any change to a description.
 The demo is set up for Haiku only, so another model first needs its prices and request settings
 added in `teamos/models.py`.

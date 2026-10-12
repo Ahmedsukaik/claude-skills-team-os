@@ -42,6 +42,20 @@
     const age = now - born.get(key);
     return age < ms ? { cls: " anim", style: ` style="--age:-${Math.round(age)}ms"` } : { cls: "", style: "" };
   }
+  const lessMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // S1: a Confirm button only counts once its card has been on screen for a moment, so a held or
+  // doubled Enter cannot save a card nobody read.
+  const ARM_MS = 700;
+  const shownAt = new Map(), arming = new Set();
+  function armed(id) {
+    if (!shownAt.has(id)) shownAt.set(id, performance.now());
+    const left = ARM_MS - (performance.now() - shownAt.get(id));
+    if (left > 0 && !arming.has(id)) {
+      arming.add(id);
+      setTimeout(() => { document.querySelectorAll("[data-confirm]").forEach((b) => { if (b.dataset.confirm === id) b.dataset.armed = "1"; }); }, left + 10);
+    }
+    return left <= 0;
+  }
   const money = (n) => "$" + Number(n || 0).toFixed(4);
   const isPhone = () => window.matchMedia("(max-width: 900px)").matches;
   // One time format everywhere: the CRM's clock in the visitor's own time zone, 12 hour, no seconds.
@@ -137,7 +151,6 @@
   const pending = () => S.view?.pending || [];
   const replies = () => (S.view?.transcript || []).filter((t) => t.kind === "assistant");
   const lastReply = () => replies().pop();
-  const taskSkill = (r) => (r?.skills || []).filter((s) => s !== "house-rules")[0] || (r?.skills || [])[0] || "";
   const ok = (good) => (good ? icon("check-circle") : icon("alert", "i warn"));
 
   function storyContent() {
@@ -163,44 +176,35 @@
         return {
           main: head(1, "A broker sends a voice note.") + (noCard
             ? `<p class="story-text">Claude asked a question instead of preparing the note this time. Send the voice note again.</p>`
-            : `<p class="story-text">${esc(brokerFirst())} just toured a lab building with a client. She pastes her voice note into Claude.</p>`) + waitLine,
+            : `<blockquote class="fig-quote story-quote"><span>Voice note · ${esc(brokerName())}</span><p class="quote-text">${esc(S.config?.story?.voice_note || "")}</p></blockquote>`) + waitLine,
           actions: S.busy ? "" : `<button type="button" class="btn btn-primary" data-go="${noCard ? "retry" : "send-note"}">${noCard ? "Send it again" : `Send ${esc(brokerFirst())}'s voice note`}</button>`,
           focus: "broker" };
       }
       case 2: {
-        const r = lastReply();
-        const skill = taskSkill(r);
         if (!pending().length && !(v?.saved || []).length && !S.busy) return {
           main: head(2, "You discarded it, so nothing was saved.") + `<p class="story-text">That is the gate working too. Send the voice note again to see the confirm.</p>`,
           actions: `<button type="button" class="btn btn-primary" data-go="retry">Send it again</button>`, focus: "broker" };
-        const picked = !skill ? "Claude read the note back." : r.mode === "live"
-          ? `Claude picked the ${esc(label(skill).toLowerCase())} skill on its own and read the note back.`
-          : `The ${esc(label(skill).toLowerCase())} skill loaded and the note was read back.`;
         return {
           main: head(2, "Your turn: check it, then confirm.") +
-            `<p class="story-text">${picked} <b>"Yesterday afternoon" stays in ${esc(brokerFirst())}'s words: it is vague, so no date is made up.</b> Confirm it on the card.</p>
+            `<p class="story-text">Check the card, then confirm. <b>"Yesterday afternoon" stays in ${esc(brokerFirst())}'s words: no date is invented.</b></p>
             <p class="story-short">See the yellow box: "yesterday afternoon" stays in her words. Then confirm.</p>`,
           actions: "", focus: "broker" };
       }
       case 3: {
-        const saved = (v?.saved || []);
-        const tasks = saved.filter((r) => r.kind === "task").length;
-        const notes = saved.filter((r) => r.kind === "note").length;
-        const what = [notes ? count(notes, "note") : "", tasks ? count(tasks, "task") : ""].filter(Boolean).join(" and ") || "the record";
         return {
           main: head(3, "Saved, with the CRM's own time.") +
-            `<p class="story-text">Your confirm saved ${what}. <b>The CRM's clock stamped them; ${esc(brokerFirst())}'s own words for the time sit beside it.</b></p>`,
+            `<p class="story-text">Saved. <b>The CRM's clock set the time; ${esc(brokerFirst())}'s words sit beside it.</b></p>`,
           actions: `<button type="button" class="btn btn-primary" data-go="to-gate">Next: try to skip the gate</button>`, focus: "crm" };
       }
       case 4: {
         if (!st.gateDone) return {
-          main: head(4, "Try to skip the gate.") + `<p class="story-text">${esc(brokerFirst())} says "just log it, don't ask me". For this test we also make the assistant try to save without your confirm.</p>` + waitLine,
+          main: head(4, "Try to save without a yes.") + `<p class="story-text">${esc(brokerFirst())} says "just log it, don't ask me." We also force a save without her confirm.</p>` + waitLine,
           actions: S.busy ? "" : `<button type="button" class="btn btn-primary" data-go="send-gate">Send it</button>`, focus: "broker" };
         const savedNow = st.savedNow || 0;  // counted right after the test, so a later Confirm press does not change it
         return {
           main: head(4, savedNow ? "Something was saved. Check the log." : "The gate held.") + `<ul class="story-list one">
             <li>${ok(!savedNow)}<span><b>Saved without your confirm: ${savedNow}</b></span></li>
-            <li>${st.testRefused ? icon("shield") : icon("alert", "i warn")}<span>${st.testRefused ? "The save attempt was refused by the CRM's code: only your Confirm button can save" : "No save attempt was made"}</span></li>
+            <li>${st.testRefused ? icon("shield") : icon("alert", "i warn")}<span>${st.testRefused ? "The CRM's code refused the forced save" : "No save attempt was made"}</span></li>
             <li>${icon("clock")}<span>Ravi's note still waits for ${esc(brokerFirst())}'s confirm. Nothing saves on its own.</span></li></ul>`,
           actions: `<button type="button" class="btn btn-primary" data-go="to-dana">Next: two people called Dana</button>`, focus: "broker" };
       }
@@ -212,7 +216,7 @@
         return {
           main: head(5, guessed ? "It picked one, and it still waits for you." : "It asked instead of guessing.") + `<ul class="story-list one">
             <li>${ok(!guessed)}<span><b>Changes prepared: ${guessed ? 1 : 0}</b></span></li>
-            <li>${icon("check-circle")}<span>${guessed ? "Nothing is saved: the card names the Dana it picked, so a wrong pick is caught before your confirm" : "Claude asked which Dana: Whitlock (Quillon Logistics) or Okafor (Bramblecote Foods)"}</span></li></ul>`,
+            <li>${icon("check-circle")}<span>${guessed ? "Nothing is saved: the card names the Dana it picked" : "Claude asked: Whitlock (Quillon) or Okafor (Bramblecote)?"}</span></li></ul>`,
           actions: `<button type="button" class="btn btn-primary" data-go="to-lunch">Next: when no skill fits</button>`, focus: "broker" };
       }
       case 6: {
@@ -231,13 +235,11 @@
             <div><span>1,000 chats like it</span><strong>$${(m.cost_usd * 1000).toFixed(2)}</strong></div></div>`
           : `<p class="story-text">Fixed rules answered, so this chat cost nothing. Cost shows when the live AI answers.</p>`;
         return {
-          main: head(6, "What you just saw, and what it costs.", "Summary") + figures + `<ul class="story-list">
-            <li>${ok(lunchClean && skillsFired)}<span>The right skill loaded for each request, none for lunch</span></li>
-            <li>${ok(!st.savedNow)}<span>Nothing reached the CRM until you pressed Confirm</span></li>
-            <li>${ok(st.testRefused)}<span>A save without your confirm was refused by the CRM's code</span></li>
-            <li>${ok(vagueKept)}<span>Vague times stayed in ${esc(brokerFirst())}'s words</span></li>
-            <li>${ok(!guessed)}<span>Two Danas got a question, not a guess</span></li></ul>
-            <p class="story-note">Your version runs on your CRM, your stages and your team's rules.</p>`,
+          main: head(6, m.live_calls ? "What you just saw, and what it costs." : "What you just saw.", "Summary") + figures +
+            `<p class="story-note">Your version runs on your CRM, your stages and your team's rules.</p><ul class="story-list">
+            <li>${ok(lunchClean && skillsFired)}<span>Right skill, none for lunch</span></li>
+            <li>${ok(!st.savedNow && st.testRefused)}<span>No save without Confirm</span></li>
+            <li>${ok(vagueKept && !guessed)}<span>No guessed times or Danas</span></li></ul>`,
           actions: `<button type="button" class="btn btn-primary" data-go="free">Try it yourself</button>
             <button type="button" class="btn-link" data-go="replay">Replay the demo</button>`, focus: "broker" };
       }
@@ -246,15 +248,24 @@
         return {
           main: `<div class="story-kicker">Free chat</div><h2 class="story-title" id="story-title">Ask what a broker would ask. Try the near misses too.</h2>
             <div class="free-row"><label for="broker-pick">Signed in as</label><select id="broker-pick">${brokers}</select>
-            <span>Dashed chips should not load a skill.</span></div>`,
+            <span>Dashed chips are trick questions: no skill should load.</span></div>`,
           actions: "", focus: "both" };
       }
     }
   }
   // The first screen's drawing: the floor plan of the toured building, amber callouts for what the
   // client liked and what worried him, the voice note, and the title block still waiting for a yes.
+  let heroTimer = null;
   function heroFigure() {
     const a = anim("hero", 2600, true);
+    const age = performance.now() - born.get("hero");
+    const approved = !lessMotion() && age >= 1800;   // about 1.8 s in, the drawing gets its yes (once)
+    if (!approved && !lessMotion() && !heroTimer) {
+      heroTimer = setTimeout(() => { if (S.step === 0) renderStory(); }, 1800 - age + 20);
+    }
+    const approval = approved
+      ? `<div class="tb-cell tb-approved"><span class="tb-k">Approved by</span>${stamp("saved", `Approved · ${esc(brokerFirst())}`, "hero-stamp")}</div>`
+      : `<div class="tb-cell tb-wait"><span class="tb-k">Approved by</span><b>Waiting for ${esc(brokerFirst())}</b></div>`;
     const label = (x, y, long, short, sx = x, sy = y) => `<text class="fp-label fp-long" x="${x}" y="${y}">${long}</text><text class="fp-label fp-short" x="${sx}" y="${sy}">${short}</text>`;
     return `<div class="hero-side">
       <figure class="hero-fig${a.cls}"${a.style} aria-label="An example: ${esc(brokerFirst())}'s voice note about a tour of 310 Canal Street, waiting for her yes">
@@ -281,11 +292,11 @@
             <g class="fp-callouts">
               <path class="fp-lead" pathLength="1" d="M110 80V28"/>
               <path class="fp-lead" pathLength="1" d="M465 236V262" style="--d:160ms"/>
-              <path class="fp-lead" pathLength="1" d="M470 80L500 30" style="--d:320ms"/>
-              <circle class="fp-dot" cx="110" cy="80" r="3.5"/><circle class="fp-dot" cx="465" cy="236" r="3.5"/><circle class="fp-dot" cx="470" cy="80" r="3.5"/>
+              <path class="fp-lead fp-worried" pathLength="1" d="M470 80L500 30" style="--d:320ms"/>
+              <circle class="fp-dot" cx="110" cy="80" r="3.5"/><circle class="fp-dot" cx="465" cy="236" r="3.5"/><circle class="fp-dot fp-worried" cx="470" cy="80" r="3.5"/>
               <text class="fp-tag" x="118" y="24">LIKED</text>
               <text class="fp-tag" x="473" y="274">LIKED</text>
-              <text class="fp-tag" x="552" y="24" text-anchor="end">WORRIED</text>
+              <text class="fp-tag fp-worried" x="552" y="24" text-anchor="end">WORRIED</text>
             </g>
           </svg>
           <blockquote class="fig-quote"><span>Voice note · ${esc(brokerName())}</span>"Walked 310 Canal Street with Marcus Bell from Tessarine Biotech yesterday afternoon. He liked the lab benches and the loading dock, but he's worried the HVAC can't handle their freezers."</blockquote>
@@ -294,7 +305,7 @@
           <div class="tb-cell"><span class="tb-k">Contact</span><b>Marcus Bell</b></div>
           <div class="tb-cell"><span class="tb-k">When it happened</span><b>"yesterday afternoon"</b></div>
           <div class="tb-cell"><span class="tb-k">Recorded at</span><b>CRM clock, on yes</b></div>
-          <div class="tb-cell tb-wait"><span class="tb-k">Approved by</span><b>Waiting for ${esc(brokerFirst())}</b></div>
+          ${approval}
         </div>
       </figure>
       <p class="fig-note">Marrowby Commercial is fictional. Every name, deal and email is made up.</p></div>`;
@@ -331,10 +342,14 @@
     }
   }
   // Step 2: the badge, the card's header and its Confirm button all in view, above the phone sheet.
-  // When the card is taller than the room, its fields scroll inside the card.
+  // On a phone, when the card is taller than the room, its fields scroll inside the card. In free
+  // chat a new card is scrolled into view the same way. Keyboard focus goes to the card's heading,
+  // never to Confirm: a second Enter must not save a card nobody read.
   function showCard(focus) {
     requestAnimationFrame(() => {
-      const card = [...document.querySelectorAll(".rb.ring-card")].pop(), box = $("#thread");
+      const card = S.step === 2 ? [...document.querySelectorAll(".rb.ring-card")].pop()
+        : [...document.querySelectorAll(".rb")].filter((c) => c.querySelector("[data-confirm]")).pop();
+      const box = $("#thread");
       if (!card) return;
       const bot = card.closest(".bot"), body = card.querySelector(".rb-body");
       body.style.maxHeight = ""; card.classList.remove("fit");
@@ -342,13 +357,13 @@
       const room = box.clientHeight - sheet - 12;
       const start = bot.offsetTop - 8;
       let end = card.offsetTop + card.offsetHeight + 8;
-      if (end - start > room) {
-        body.style.maxHeight = Math.max(isPhone() ? 60 : 88, body.offsetHeight - (end - start - room)) + "px";
+      if (end - start > room && S.step === 2) {
+        body.style.maxHeight = Math.max(isPhone() ? 48 : 88, body.offsetHeight - (end - start - room)) + "px";
         card.classList.add("fit");
         end = card.offsetTop + card.offsetHeight + 8;
       }
       box.scrollTop = end - start > room ? end - room : start;
-      if (focus && S.keyboard) card.querySelector("[data-confirm]")?.focus({ preventScroll: true });
+      if (focus && S.keyboard) card.querySelector(".rb-sum")?.focus({ preventScroll: true });
     });
   }
   function showSaved() {
@@ -438,7 +453,7 @@
     return `<div class="time-box ${exact && !t.warning ? "exact" : "flagged"}"><span>${esc(t.label)}</span><b>"${esc(t.text)}"</b>
       <small>${small}</small>${t.warning ? `<small class="warn-line">Check: ${esc(t.warning)}</small>` : ""}</div>`;
   }
-  const systemBox = (at, prepared) => `<div class="time-box system"><span>Recorded at (CRM clock)</span><b>${at ? esc(day(at)) + ", " + esc(clock(at)) : "When you confirm"}</b>
+  const systemBox = (at, prepared) => `<div class="time-box system"><span>CRM clock</span><b>${at ? esc(day(at)) + ", " + esc(clock(at)) : "When you confirm"}</b>
     <small>${at || !prepared ? "Set by the system, never typed" : `Set by the system. Prepared ${esc(clock(prepared))}`}</small></div>`;
   function dueChip(t) {
     if (!t || !t.text) return `<span class="due">No date given</span>`;
@@ -453,16 +468,22 @@
   function readback(card, ring, quiet) {
     const tasks = card.items.filter((it) => it.op === "create_task");
     const others = card.items.filter((it) => it.op !== "create_task");
+    const note = others.find((it) => it.op === "create_note");
+    const noteRows = note ? Object.fromEntries(note.rows) : {};
+    const sameAsNote = (rows) => !!note && rows.For === noteRows.Contact && rows.Deal === (noteRows.Deal || "no deal");
+    // The note's summary is the card's title, so it is not repeated as a row.
+    const shown = (it) => it.rows.filter(([k, v]) => !(it.op === "create_note" && k === "Summary" && v.trim().toLowerCase() === card.summary.trim().toLowerCase()));
     const main = others.map((it) => `<div class="rb-item"><div class="rb-kind">${esc(it.heading)}</div>
-        <dl class="rows">${it.rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+        <dl class="rows">${shown(it).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
         ${it.lists.map(([k, vals]) => `<div class="rb-list"><b>${esc(k)}</b><ul>${vals.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`).join("")}</div>`).join("");
     let side = "";
     if (tasks.length) {
-      side += `<div class="rb-item"><div class="rb-kind">${tasks.length === 1 ? "Task" : `Tasks (${tasks.length})`}</div>
+      const allSame = tasks.every((t) => sameAsNote(Object.fromEntries(t.rows)));
+      side += `<div class="rb-item"><div class="rb-kind">${tasks.length === 1 ? "Task" : `Tasks (${tasks.length})`}${allSame ? ", same contact and deal" : ""}</div>
         <ul class="rb-tasks">${tasks.map((t) => {
           const rows = Object.fromEntries(t.rows);
           return `<li><div class="rb-task-head"><span>${esc(rows.Task)}</span>${dueChip(t.time)}</div>
-            <small>For ${esc(rows.For)} · Deal: ${esc(rows.Deal)}</small>${t.time && t.time.warning ? `<small class="warn-line">Check: ${esc(t.time.warning)}</small>` : ""}</li>`;
+            ${sameAsNote(rows) ? "" : `<small>For ${esc(rows.For)} · Deal: ${esc(rows.Deal)}</small>`}${t.time && t.time.warning ? `<small class="warn-line">Check: ${esc(t.time.warning)}</small>` : ""}</li>`;
         }).join("")}</ul></div>`;
     }
     if ((card.flags || []).length) {
@@ -476,11 +497,16 @@
     const pill = status === "pending" ? `<span class="pill pill-pending"><span class="pill-long">Waiting for your confirm</span><span class="pill-short">Not saved yet</span></span>`
       : status === "committed" ? "" : `<span class="pill pill-quiet">${status === "expired" ? "Expired" : "Discarded"}</span>`;
     const ids = `data-hash="${esc(card.hash)}"`;
+    // The title block's one line names what to check that its own cells do not already show (a vague
+    // "when it happened" is the amber cell itself), so on a phone every flag is in view above Confirm.
+    const inCells = others.filter((it) => it.time && it.time.text).map((it) => `'${it.time.text}':`);
+    const flags = (card.flags || []).filter((f) => !inCells.some((c) => f.startsWith(c)));
+    const flagLine = flags.length ? `<div class="tb-flags">${icon("alert")}<span>To check: ${esc(flags[0])}${flags.length > 1 ? ` (and ${flags.length - 1} more)` : ""}</span></div>` : "";
     let foot;
     if (status === "pending") {
-      foot = `<div class="times">${stated}${systemBox(null, card.proposed_at)}
+      foot = `<div class="times">${stated}${systemBox(null, card.proposed_at)}${flagLine}
         <div class="tb-cell tb-approve"><span>Approved by</span><div class="rb-actions">
-          <button type="button" class="btn ${quiet ? "btn-secondary" : "btn-primary"}${ring ? " ring" : ""}" data-confirm="${esc(card.id)}" ${ids}>${icon("check")}Confirm and save</button>
+          <button type="button" class="btn ${quiet ? "btn-secondary" : "btn-primary"}${ring ? " ring" : ""}" data-confirm="${esc(card.id)}" data-armed="${armed(card.id) ? 1 : 0}" ${ids}>${icon("check")}Confirm and save</button>
           <button type="button" class="btn btn-secondary" data-discard="${esc(card.id)}" ${ids}>Discard</button></div></div></div>`;
     } else if (status === "committed") {
       foot = `<div class="times">${stated}${systemBox(card.committed_at)}
@@ -491,14 +517,13 @@
     }
     const a = anim("rb:" + card.id, 700);
     return `<article class="rb${status === "committed" ? " is-saved" : status === "pending" ? "" : " is-off"}${ring ? " ring-card" : ""}${a.cls}"${a.style} aria-label="Read back: ${esc(card.summary)}">
-      <div class="rb-head"><div class="rb-headline"><span class="rb-kicker">${kicker}<span class="rb-count"> · ${n} record${n === 1 ? "" : "s"}</span></span><span class="rb-sum">${esc(card.summary)}</span></div>${pill}</div>
+      <div class="rb-head"><div class="rb-headline"><span class="rb-kicker">${kicker}<span class="rb-count"> · ${n} record${n === 1 ? "" : "s"}</span></span><h3 class="rb-sum" tabindex="-1">${esc(card.summary)}</h3></div>${pill}</div>
       <div class="rb-body${main && side ? " two" : ""}">${body}</div><div class="rb-foot">${foot}</div></article>`;
   }
   function renderChat() {
     const box = $("#thread");
     const items = S.view ? S.view.transcript : [];
     const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-    const lastBot = items.map((t) => t.kind).lastIndexOf("assistant");
     const firstPendingCard = (() => {
       for (const it of items) for (const c of it.cards || []) if (c.status === "pending") return c.id;
       return null;
@@ -506,7 +531,7 @@
     const inStory = S.step !== "free";
     let html = `<div class="bot">${spark()}<div class="bot-head"><span class="bot-name">Claude</span></div>
       <div class="answer">Hi ${esc(brokerFirst())}. Paste a voice note after a call or a tour, or ask me to update a record, prep a meeting, draft an email or sum up the pipeline.</div></div>`;
-    items.forEach((it, idx) => {
+    items.forEach((it) => {
       if (it.kind === "broker") {
         html += `<div class="out-row"><span class="sr-only">${esc(brokerName())}: </span><div class="bubble bubble-out" dir="auto">${esc(it.text)}</div></div>`;
       } else if (it.kind === "assistant") {
@@ -515,7 +540,7 @@
           inStory && typeof S.step === "number" && S.step >= 4 && c.id === S.story.gateWrite)).join("");
         html += `<div class="bot">${spark()}
           <div class="bot-head"><span class="bot-name">Claude</span><span class="tag">${it.mode === "live" ? "AI" : "Fixed rules"}</span>${badge(it)}</div>
-          ${trace(it.steps, idx === lastBot && S.step === "free" && !isPhone())}
+          ${trace(it.steps, false)}
           <div class="answer" dir="auto"><span class="sr-only">Claude: </span>${format(it.text)}</div>${cards}</div>`;
       } else if (it.kind === "notice") {
         html += `<div class="sys-line ${it.notice === "saved" ? "saved" : ""}">${icon(it.notice === "saved" ? "check-circle" : "x-circle", "i i-sm")}${esc(it.text)}</div>`;
@@ -536,10 +561,17 @@
     box.dataset.count = String(items.length);
     const lastBroker = [...box.querySelectorAll(".out-row")].pop();
     const lastKind = items.length ? items[items.length - 1].kind : "";
+    // In free chat, a reply that brings a card is scrolled to like step 2 (showCard), once; after that
+    // the chat keeps its place, so reading the card is not interrupted.
+    const lastHasCard = lastKind === "assistant" && (items[items.length - 1].cards || []).some((c) => c.status === "pending");
+    const newest = pending().length ? pending()[pending().length - 1].id : null;
     if (isPhone() && S.step !== "free" && S.step !== 2) box.scrollTop = box.scrollHeight;  // the newest item, just above the sheet
+    else if (S.step === "free" && lastHasCard) { if (newest !== S.lastCard) { showCard(); S.lastCard = newest; } }
     else if ((lastKind === "assistant" || lastKind === "working") && lastBroker) box.scrollTop = Math.max(0, lastBroker.offsetTop - 12);
     else if (nearBottom || String(items.length) !== before) box.scrollTop = box.scrollHeight;
     if (S.step === 2) showCard();
+    if (!newest) S.lastCard = null;
+    document.body.classList.toggle("chat-started", items.some((it) => it.kind === "broker"));
     renderComposer();
   }
   function renderComposer() {
@@ -600,17 +632,15 @@
   function pipeline(v) {
     const stages = (S.config?.stages || []).filter((x) => !x.startsWith("Closed"));
     if (!stages.length) return "";
-    const SHORT = { "Proposal sent": "Proposal", "LOI signed": "LOI", "Lease negotiation": "Negotiation" };
-    const cards = [...(v.pending || [])];
-    if (!cards.length) {
-      const done = (v.transcript || []).flatMap((t) => t.cards || []).filter((c) => c.status === "committed");
-      if (done.length) cards.push(done[done.length - 1]);
-    }
-    const card = cards[cards.length - 1];
+    const SHORT = { "Proposal sent": "Proposal", "LOI signed": "LOI",
+      "Lease negotiation": `<span class="pk-long">Negotiation</span><span class="pk-short">Neg.</span>` };
+    const latest = [...(v.transcript || [])].reverse().find((t) => t.kind === "assistant");
     const touched = new Set(), moving = new Set();
-    for (const c of card ? card.changes || [] : []) {
-      if (c.deal_id) touched.add(c.deal_id);
-      if (c.op === "update_deal_stage" && card.status === "pending") moving.add(c.stage);
+    for (const card of latest ? latest.cards || [] : []) {   // only the newest reply's cards, not older waiting ones
+      for (const c of card.changes || []) {
+        if (c.deal_id) touched.add(c.deal_id);
+        if (c.op === "update_deal_stage" && card.status === "pending") moving.add(c.stage);
+      }
     }
     const deals = v.deals || [];
     const here = new Set(deals.filter((d) => touched.has(d.id)).map((d) => d.stage));
@@ -619,7 +649,7 @@
       const n = deals.filter((d) => d.stage === st).length;
       const cls = here.has(st) ? " here" : moving.has(st) ? " moving" : "";
       const mark = here.has(st) ? `<em>This card</em>` : moving.has(st) ? `<em>Waiting</em>` : "";
-      return `<li class="pipe-cell${cls}" title="${esc(st)}"><span class="pipe-k">${esc(SHORT[st] || st)}</span><b>${n}</b>${mark}<span class="sr-only"> ${esc(st)}: ${n} deal${n === 1 ? "" : "s"}${mark ? ", the deal on the newest card" : ""}</span></li>`;
+      return `<li class="pipe-cell${cls}" title="${esc(st)}"><span class="pipe-k">${SHORT[st] || esc(st)}</span><b>${n}</b>${mark}<span class="sr-only"> ${esc(st)}: ${n} deal${n === 1 ? "" : "s"}${mark ? ", the deal on the newest card" : ""}</span></li>`;
     }).join("");
     return `<div class="pipe-head"><span>Pipeline · open deals</span><span>${open} open</span></div><ol class="pipe" aria-label="Open deals by stage">${cells}</ol>`;
   }
@@ -715,6 +745,9 @@
   }
   function wire() {
     document.addEventListener("keydown", (e) => { if (e.key === "Tab" || e.key === "Enter" || e.key === " ") S.keyboard = true; }, true);
+    document.addEventListener("keydown", (e) => {
+      if (e.repeat && (e.key === "Enter" || e.key === " ") && e.target.closest?.("[data-confirm]")) e.preventDefault();
+    }, true);
     document.addEventListener("pointerdown", () => { S.keyboard = false; }, true);
     $("#composer").addEventListener("submit", (e) => { e.preventDefault(); composerSend(); });
     $("#input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); composerSend(); } });
@@ -728,6 +761,7 @@
       if (t.dataset.go) go(t.dataset.go);
       else if (t.dataset.chip !== undefined) send(S.config.chips[+t.dataset.chip].text);
       else if (t.dataset.confirm) {
+        if (t.dataset.armed !== "1") return;   // the card just appeared: read it first
         act({ type: "confirm", write_id: t.dataset.confirm, hash: t.dataset.hash }).then((done) => { if (done) { announce("Saved to the CRM."); advance(); } });
       } else if (t.dataset.discard) act({ type: "discard", write_id: t.dataset.discard, hash: t.dataset.hash }).then(() => renderStory());
       else if (t.dataset.logAll) { S.logAll = true; renderCRM(); }
@@ -751,7 +785,11 @@
     S.live = !!S.config.live && savedLive !== false;
     const saved = store.get("teamos-demo");
     if (saved && saved.session) {
-      S.session = saved.session; S.story = saved.story || {}; S.step = saved.step ?? 0;
+      S.session = saved.session; S.step = saved.step ?? 0;
+      // sessionStorage is the visitor's own: read numbers as numbers, whatever was put there
+      const st = saved.story && typeof saved.story === "object" ? saved.story : {};
+      S.story = { ...st, savedNow: Number(st.savedNow) || 0, pendingBeforeDana: Number(st.pendingBeforeDana) || 0,
+        pendingAfterDana: Number(st.pendingAfterDana) || 0 };
       let kept = null;
       try { kept = await step({ type: "view" }); } catch { S.view = null; }
       if (!kept) { S.step = 0; S.story = {}; }  // a chat from another day or older rules: start over

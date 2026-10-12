@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 from conftest import ScriptedModel, free_port, serve, text, tool
+from playwright.sync_api import expect
 
 from teamos.agent import Agent
 from teamos.web import create_app
@@ -73,6 +74,28 @@ def fully_visible(page, locator) -> None:
     assert box["y"] + box["height"] <= bottom + 1, (box, bottom)
 
 
+def settled(page, locator, timeout: float = 3.0) -> None:
+    """fully_visible, polled: the page may still be scrolling a card into view or laying out a step."""
+    import time
+    expect(locator).to_be_in_viewport(ratio=1, timeout=timeout * 1000)
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fully_visible(page, locator)
+            return
+        except AssertionError:
+            if time.monotonic() > deadline:
+                raise
+            page.wait_for_timeout(50)
+
+
+def armed_confirm(page):
+    """Confirm counts only once its card has been on screen for a moment (data-armed)."""
+    confirm = page.locator("[data-confirm][data-armed='1']").first
+    confirm.wait_for()
+    return confirm
+
+
 def words(locator) -> str:
     """An element's text as written, with spaces tidied. Labels are drawn in uppercase by the
     stylesheet, so inner_text() would read "SKILL USED"; the words themselves do not change."""
@@ -90,8 +113,7 @@ def run_story(page, check) -> None:
     check(button(page, "Send Priya's voice note"))
     button(page, "Send Priya's voice note").click()
     page.locator(".story-title", has_text="Your turn: check it, then confirm.").wait_for()
-    confirm = page.locator("[data-confirm]").first
-    page.wait_for_timeout(150)
+    confirm = armed_confirm(page)
     check(confirm)
     confirm.click()
     page.locator(".story-title", has_text="Saved, with the CRM's own time.").wait_for()
@@ -117,8 +139,7 @@ def test_the_story_at_every_size_with_each_action_in_view(browser, site, size):
     context, page, errors = open_page(browser, site, *size)
 
     def check(locator):
-        page.wait_for_timeout(120)
-        fully_visible(page, locator)
+        settled(page, locator)
         no_sideways_scroll(page)
 
     run_story(page, check)
@@ -140,14 +161,18 @@ def test_what_each_step_shows(browser, site):
     card = page.locator(".rb").first
     assert '"yesterday afternoon"' in card.inner_text() and "Vague, so no date set" in card.inner_text()
     assert "When you confirm" in card.inner_text() and "Due Fri, Oct" in card.inner_text()
-    assert "For Marcus Bell (Tessarine Biotech)" in card.inner_text() and "Deal: Tessarine Biotech" in card.inner_text()
-    page.locator("[data-confirm]").first.click()
+    assert "Marcus Bell (Tessarine Biotech)" in card.inner_text() and "Tessarine Biotech at 310 Canal Street (Touring)" in card.inner_text()
+    assert "Tasks (3), same contact and deal" in words(card.locator(".rb-side .rb-kind").first)
+    assert "Summary" not in words(card.locator(".rows"))   # it is the card's title
+    assert card.evaluate("c => !c.classList.contains('fit')")   # the whole card fits at 1440x900, nothing scrolls inside
+    armed_confirm(page).click()
     page.locator(".story-title", has_text="Saved").wait_for()
     note = page.locator(".rec", has_text="Tour of 310 Canal Street").first
-    assert "Recorded at (CRM clock)" in words(note) and '"yesterday afternoon"' in note.inner_text()
-    assert "Saved one note and three tasks" in note.inner_text() and words(note).count("Recorded at") == 1
-    assert "one note and three tasks" in page.locator("#story").inner_text()
+    assert "CRM clock" in words(note) and '"yesterday afternoon"' in note.inner_text()
+    assert "Saved one note and three tasks" in note.inner_text() and words(note).count("CRM clock") == 1
+    assert "The CRM's clock set the time; Priya's words sit beside it." in page.locator("#story").inner_text()
     button(page, "Next: try to skip the gate").click()
+    page.locator(".story-title", has_text="Try to save without a yes.").wait_for()
     button(page, "Send it").click()
     page.locator(".story-title", has_text="The gate held.").wait_for()
     assert "Saved without your confirm: 0" in page.locator("#story").inner_text()
@@ -160,13 +185,14 @@ def test_what_each_step_shows(browser, site):
     button(page, "Send it").click()
     page.locator(".story-title", has_text="It asked").wait_for()
     assert "Changes prepared: 0" in page.locator("#story").inner_text()
+    assert page.locator(".pipe-cell.here").count() == 0   # the newest reply has no card; Ravi's older one is not marked
     button(page, "Next: when no skill fits").click()
     button(page, "Ask about lunch").click()
     page.locator(".story-title", has_text="What you just saw").wait_for()
     assert "No skill used" in words(page.locator(".bot .skill").last)
     story = page.locator("#story").inner_text()
-    assert "What you just saw, and what it costs." in story and "cost nothing" in story and "Cost shows when the live AI" in story
-    assert page.locator("#story .story-list li").count() == 5 and "Your version runs on your CRM" in story
+    assert "What you just saw." in story and "cost nothing" in story and "Cost shows when the live AI" in story  # fixed rules
+    assert page.locator("#story .story-list li").count() == 3 and "Your version runs on your CRM" in story
     assert page.locator("#story .story-list .warn").count() == 0  # every claim held in this run
     button(page, "Try it yourself").click()
     page.locator(".story-title", has_text="Ask what a broker would ask").wait_for()
@@ -219,6 +245,10 @@ def test_free_chat_near_miss_and_discard(browser, site):
     page.locator(".bot .skill", has_text="No skill used").wait_for()
     page.get_by_role("button", name="Debrief a coffee with Hana").click()
     page.locator(".rb").wait_for()
+    assert page.locator(".trace[open]").count() == 0   # closed until opened
+    settled(page, page.locator(".rb [data-confirm]"))   # the new card is scrolled into view
+    tops = {round(c.bounding_box()["y"]) for c in page.locator(".chip").all() if c.is_visible()}
+    assert len(tops) == 1   # once the chat has started, the chips are one scrolling row
     assert '"next Tuesday": kept as words' in page.locator(".rb").inner_text()
     page.locator("[data-discard]").click()
     page.locator(".rb .pill", has_text="Discarded").wait_for()
@@ -234,9 +264,10 @@ def test_on_a_phone_the_story_switches_panes(browser, site):
     button(page, "Send Priya's voice note").click()
     page.locator(".story-title", has_text="Your turn").wait_for()
     assert page.locator(".broker-pane").is_visible() and page.locator(".crm-pane").is_hidden()
-    page.locator("[data-confirm]").first.click()
+    armed_confirm(page).click()
     page.locator(".story-title", has_text="Saved").wait_for()
     assert page.locator(".crm-pane").is_visible() and page.locator(".broker-pane").is_hidden()
+    assert page.locator(".brand-sub").inner_text().strip() == "FICTIONAL DEMO"
     fully_visible(page, page.locator(".rec").first.locator(".time-box").first)
     page.locator(".switch-row button", has_text="Broker").click()
     assert page.locator(".broker-pane").is_visible()
@@ -331,7 +362,11 @@ def test_the_first_screen_is_a_drawing_waiting_for_a_yes(browser, site):
     context, page, errors = open_page(browser, site)
     figure = page.locator(".hero-fig")
     assert figure.is_visible() and figure.locator("svg.plan").get_attribute("aria-hidden") == "true"
-    assert "Waiting for Priya" in words(figure.locator(".tb")) and "yesterday afternoon" in words(figure.locator(".fig-quote"))
+    assert "yesterday afternoon" in words(figure.locator(".fig-quote"))
+    stamp = figure.locator(".tb .stamp-saved")
+    expect(stamp).to_have_text("Approved · Priya", timeout=4000)   # about 1.8 s in, the drawing gets its yes
+    assert page.evaluate("getComputedStyle(document.querySelector('.fp-tag.fp-worried')).fill") != \
+        page.evaluate("getComputedStyle(document.querySelector('.fp-tag:not(.fp-worried)')).fill")
     assert [" ".join(li.inner_text().split()) for li in page.locator(".hero-points li").all()] == [
         "01 Voice note in, CRM note and tasks out", "02 A read back before every write", "03 Times are never guessed"]
     assert page.locator(".layout").is_hidden()
@@ -347,8 +382,8 @@ def test_the_pipeline_strip_counts_the_crm_and_marks_the_card(browser, site):
     button(page, "Start the demo").click()
     button(page, "Send Priya's voice note").click()
     page.locator(".story-title", has_text="Your turn").wait_for()
-    assert [words(c.locator(".pipe-k")) + " " + words(c.locator("b")) for c in cells.all()] == [
-        "Lead 1", "Touring 2", "Proposal 1", "LOI 1", "Negotiation 1"]  # open deals in crm/data.py
+    assert [c.locator(".pipe-k").inner_text().strip() + " " + words(c.locator("b")) for c in cells.all()] == [
+        "LEAD 1", "TOURING 2", "PROPOSAL 1", "LOI 1", "NEGOTIATION 1"]  # open deals in crm/data.py, as shown
     assert cells.nth(1).get_attribute("class").split() == ["pipe-cell", "here"]  # Tessarine at 310 Canal is touring
     assert page.locator(".pipe-cell.here").count() == 1
     context.close()
@@ -360,8 +395,8 @@ def test_a_confirm_stamps_the_card_and_the_record(browser, site):
     button(page, "Start the demo").click()
     button(page, "Send Priya's voice note").click()
     page.locator(".story-title", has_text="Your turn").wait_for()
-    assert page.locator(".stamp").count() == 0  # nothing is stamped before the yes
-    page.locator("[data-confirm]").first.click()
+    assert page.locator("#thread .stamp").count() == 0  # nothing is stamped before the yes
+    armed_confirm(page).click()
     page.locator(".story-title", has_text="Saved, with").wait_for()
     card_stamp = page.locator(".rb .stamp-saved")
     assert card_stamp.count() == 1 and words(card_stamp).startswith("Saved · ")
@@ -379,6 +414,8 @@ def test_motion_is_off_when_the_visitor_asks_for_less(browser, site):
     page.locator(".hero-fig").wait_for()
     assert page.evaluate("getComputedStyle(document.querySelector('.fp-lead')).animationName") == "none"
     assert page.evaluate("getComputedStyle(document.querySelector('.fp-lead')).strokeDashoffset") in ("0", "0px")
+    page.wait_for_timeout(2400)
+    assert "Waiting for Priya" in words(page.locator(".hero-fig .tb")) and page.locator(".hero-fig .stamp").count() == 0
     context.close()
 
 
@@ -390,3 +427,50 @@ def test_dark_mode_is_blueprint_at_night(browser, site):
     assert page.evaluate("getComputedStyle(document.body).backgroundColor") == "rgb(11, 22, 40)"
     assert page.evaluate("getComputedStyle(document.querySelector('.story-headline')).color") == "rgb(231, 238, 248)"
     context.close()
+
+
+
+def test_a_card_is_read_before_it_can_be_saved(browser, site):
+    """S1: keyboard focus lands on the card's heading, a press on Confirm in the first moment does
+    nothing, and a held Enter does not repeat into a save."""
+    context, page, errors = open_page(browser, site)
+    button(page, "Start the demo").click()
+    send = button(page, "Send Priya's voice note")
+    send.focus()
+    page.keyboard.press("Enter")
+    page.locator(".story-title", has_text="Your turn").wait_for()
+    confirm = page.locator("[data-confirm]").first
+    assert confirm.get_attribute("data-armed") == "0"
+    confirm.evaluate("b => b.click()")                         # too soon: ignored
+    expect(page.locator(".rb-sum").first).to_be_focused(timeout=2000)   # focus is on the heading, not on Confirm
+    page.keyboard.press("Enter")                              # a second Enter saves nothing
+    page.wait_for_timeout(300)
+    assert page.evaluate("document.querySelectorAll('#panel .rec.is-saved').length") == 0
+    held = page.evaluate("""() => { const b = document.querySelector('[data-confirm]'); b.focus();
+        const e = new KeyboardEvent('keydown', {key: 'Enter', repeat: true, bubbles: true, cancelable: true});
+        b.dispatchEvent(e); return e.defaultPrevented; }""")
+    assert held is True
+    armed_confirm(page).click()                               # a real press, after a moment, saves
+    page.locator(".story-title", has_text="Saved, with").wait_for()
+    context.close()
+    assert errors == []
+
+
+def test_the_story_band_keeps_its_button_in_one_place(browser, site):
+    context, page, errors = open_page(browser, site, 1280, 720)
+    spots = []
+    button(page, "Start the demo").click()
+    spots.append(button(page, "Send Priya's voice note").bounding_box())
+    button(page, "Send Priya's voice note").click()
+    page.locator(".story-title", has_text="Your turn").wait_for()
+    assert page.locator(".rb.ring-card").evaluate("c => !c.classList.contains('fit')")   # the whole card fits at 1280x720
+    settled(page, page.locator(".rb.ring-card .rb-sum"))
+    armed_confirm(page).click()
+    spots.append(button(page, "Next: try to skip the gate").bounding_box())
+    button(page, "Next: try to skip the gate").click()
+    button(page, "Send it").click()
+    page.locator(".story-title", has_text="The gate held.").wait_for()
+    spots.append(button(page, "Next: two people called Dana").bounding_box())
+    assert len({round(s["x"]) for s in spots}) == 1 and len({round(s["y"]) for s in spots}) == 1
+    context.close()
+    assert errors == []

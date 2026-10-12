@@ -64,7 +64,7 @@
   --icon-sm: 14px;
   --icon-md: 16px;
   --icon-lg: 20px;
-  --chat-max-width: 760px;
+  --chat-max-width: 840px;
   --bubble-max-width: 540px;
   --grid-size: 24px;
 
@@ -144,6 +144,7 @@
   --shadow-lg: 0 1px 0 var(--color-border), 0 24px 48px -28px rgba(15, 34, 64, 0.35);
   --shadow-xl: 0 -18px 40px -24px rgba(15, 34, 64, 0.35);
   --shadow-focus: 0 0 0 3px var(--color-focus-ring);
+  --shadow-scroll: inset 0 -12px 10px -12px rgba(15, 34, 64, 0.3);   /* more below: the card's fields scroll */
 
   color-scheme: light;
 }
@@ -203,6 +204,7 @@
     --shadow-md: 0 1px 0 #0a1424, 0 14px 28px -18px rgba(0, 0, 0, 0.7);
     --shadow-lg: 0 1px 0 #0a1424, 0 24px 48px -28px rgba(0, 0, 0, 0.8);
     --shadow-xl: 0 -18px 40px -24px rgba(0, 0, 0, 0.8);
+    --shadow-scroll: inset 0 -14px 12px -12px rgba(127, 168, 230, 0.35);
     color-scheme: dark;
   }
 }
@@ -259,5 +261,6 @@
   --shadow-md: 0 1px 0 #0a1424, 0 14px 28px -18px rgba(0, 0, 0, 0.7);
   --shadow-lg: 0 1px 0 #0a1424, 0 24px 48px -28px rgba(0, 0, 0, 0.8);
   --shadow-xl: 0 -18px 40px -24px rgba(0, 0, 0, 0.8);
+  --shadow-scroll: inset 0 -14px 12px -12px rgba(127, 168, 230, 0.35);
   color-scheme: dark;
 }

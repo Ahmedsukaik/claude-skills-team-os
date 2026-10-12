@@ -132,7 +132,7 @@ body.app-body { overflow: hidden; }
 .top-actions .btn { height: 44px; }
 .phone-only { display: none !important; }
 
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(400px, 38vw, 560px); min-height: 0; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(380px, 34vw, 540px); min-height: 0; }
 
 /* ---------- the broker's side: a sheet on the paper */
 .broker-pane { display: flex; flex-direction: column; align-items: center; min-height: 0; padding: var(--space-5) var(--space-8) 0; }
@@ -217,6 +217,8 @@ body.app-body { overflow: hidden; }
 .rb-headline { display: grid; gap: 1px; min-width: 0; }
 .rb-kicker { font-size: 10.5px; line-height: 15px; color: var(--color-accent-text); }
 .rb-sum { font-size: var(--text-lg); line-height: 22px; font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
+.rb-sum:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.tb-flags { display: none; }
 .rb-body { display: grid; }
 .rb-col { display: grid; align-content: start; gap: var(--space-3); padding: 14px 18px; min-width: 0; }
 @container (min-width: 560px) {
@@ -248,7 +250,7 @@ body.app-body { overflow: hidden; }
 .rb-flags { gap: var(--space-1); }
 .rb-flags .rb-kind { color: var(--color-amber-text); }
 .rb-flags ul { list-style: square; padding-left: 18px; font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--color-amber-text); }
-.rb.fit .rb-body { overflow-y: auto; box-shadow: inset 0 -12px 10px -12px rgba(15, 34, 64, .3); scrollbar-width: thin; }
+.rb.fit .rb-body { overflow-y: auto; box-shadow: var(--shadow-scroll); scrollbar-width: thin; }
 .due {
   flex: none; font-family: var(--font-mono); font-size: 11px; line-height: 18px; padding: 0 6px; border-radius: var(--radius-xs);
   border: 1px solid var(--color-border); color: var(--color-text-secondary); white-space: nowrap; letter-spacing: .02em;
@@ -261,7 +263,7 @@ body.app-body { overflow: hidden; }
 .times { display: flex; flex-wrap: wrap; }
 .time-box, .tb-cell { flex: 1 1 0; min-width: 0; display: grid; align-content: start; gap: 2px; padding: 11px 18px 12px; }
 .times > * + * { border-left: 1px solid var(--color-border); }
-.time-box > span, .tb-cell > span { display: block; font-size: 10px; line-height: 14px; color: var(--color-text-secondary); }
+.time-box > span, .tb-cell > span { display: block; font-size: 10px; line-height: 14px; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .time-box b, .tb-cell b { display: block; font-size: var(--text-md); line-height: 20px; font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .time-box small, .tb-cell small { display: block; font-size: var(--text-xs); line-height: 16px; color: var(--color-text-secondary); }
 .time-box.flagged { background: var(--color-amber-soft); }
@@ -429,9 +431,10 @@ body.app-body { overflow: hidden; }
    THE STORY: one sheet at a time, one action per sheet
    ===================================================================== */
 .story {
-  position: relative; z-index: 4; display: grid; grid-template-columns: fit-content(1000px) auto; justify-content: start; column-gap: var(--space-10);
+  position: relative; z-index: 4; display: grid; grid-template-columns: minmax(0, 72ch) auto; justify-content: start; column-gap: var(--space-10);
   align-items: center; padding: var(--space-5) var(--space-10); background: var(--color-surface); border-bottom: 1px solid var(--color-border);
-  min-height: 144px;   /* the band keeps one height from sheet to sheet, so the panes below do not jump */
+  font-size: 16px;     /* so 72ch is a comfortable line of story text */
+  min-height: 186px;   /* the tallest sheet: the band keeps one height and its button one place, so nothing jumps */
 }
 body[data-step="free"] .story { min-height: 0; padding-top: var(--space-4); padding-bottom: var(--space-4); }
 .story-main { min-width: 0; display: grid; gap: 6px; }
@@ -440,15 +443,19 @@ body[data-step="free"] .story { min-height: 0; padding-top: var(--space-4); padd
 .story-bars i { width: 14px; height: 3px; background: var(--color-border); }
 .story-bars i.on { background: var(--color-accent); }
 .story-title { font-size: var(--text-3xl); line-height: var(--leading-3xl); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight); }
-.story-text { font-size: var(--text-lg); line-height: var(--leading-lg); color: var(--color-text-secondary); max-width: 1000px; }
+.story-text { font-size: var(--text-lg); line-height: var(--leading-lg); color: var(--color-text-secondary); }
+.story-quote { margin-top: 2px; font-size: var(--text-sm); line-height: 20px; padding: 8px 12px 9px; }
+.story-quote .quote-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; color: var(--color-amber-strong); }
+.story-quote > span { margin-bottom: 1px; }
 .story-text b { color: var(--color-text); font-weight: var(--weight-semibold); }
 .story-text code, .story-list code { font-size: 12.5px; color: var(--color-text); }
 .story-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; }
 .story .btn-primary { height: 46px; padding: 0 var(--space-5); font-size: var(--text-md); }
 .story-wait { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text-secondary); }
-.story-list { display: grid; grid-template-columns: repeat(3, minmax(0, max-content)); gap: var(--space-1-5) var(--space-8); margin-top: var(--space-1); }
+.story-list { display: grid; grid-template-columns: repeat(3, minmax(0, max-content)); gap: var(--space-1-5) var(--space-6); margin-top: var(--space-1); }
 .story-list.one { grid-template-columns: minmax(0, 1fr); }
-.story-list li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: var(--space-2); font-size: var(--text-base); line-height: 21px; color: var(--color-text-secondary); }
+.story-list li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: var(--space-2); font-size: var(--text-base); line-height: 21px; color: var(--color-text-secondary); white-space: nowrap; }
+.story-list.one li { white-space: normal; }
 .story-list li .i { width: 16px; height: 16px; margin-top: 2px; color: var(--color-accent-text); }
 .story-list li .i.warn { color: var(--color-amber-text); }
 .story-list li b { color: var(--color-text); font-weight: var(--weight-semibold); }
@@ -476,8 +483,9 @@ body.in-story .send:not(:disabled) { background: var(--color-surface-muted); col
    ===================================================================== */
 body[data-step="0"] .app { grid-template-rows: var(--topbar-height) minmax(0, 1fr); }
 body[data-step="0"] .layout, body[data-step="0"] .switch-row { display: none !important; pointer-events: none; }
-body[data-step="0"] .story { display: block; min-height: 0; overflow-y: auto; padding: var(--space-12) var(--space-14); background: transparent; border: 0; }
-.hero { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-12) var(--space-14); max-width: 1328px; min-height: 100%; margin: 0 auto; }
+body[data-step="0"] .story { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: var(--space-12) var(--space-14); background: transparent; border: 0; }
+/* centred in the screen; when it is taller than the screen it starts at the top (a column's auto margins never go negative) */
+.hero { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-12) var(--space-14); width: 100%; max-width: 1328px; margin: auto; }
 .hero-copy { flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-6); }
 .kicker { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; color: var(--color-accent-text); }
 .kicker i { display: inline-block; width: 28px; height: 1px; background: currentColor; }
@@ -504,7 +512,10 @@ body[data-step="0"] .story { display: block; min-height: 0; overflow-y: auto; pa
 .fp-short { display: none; }
 .fp-lead { fill: none; stroke: var(--color-amber-line); stroke-width: 1.4; }
 .fp-dot { fill: var(--color-amber-line); }
+.fp-lead.fp-worried { stroke: var(--color-danger-text); }
+.fp-dot.fp-worried { fill: var(--color-danger-text); }
 .fp-tag { font-family: var(--font-mono); font-size: 11px; font-weight: var(--weight-semibold); letter-spacing: .08em; fill: var(--color-amber-text); paint-order: stroke; stroke: var(--color-surface); stroke-width: 5px; stroke-linejoin: round; }
+.fp-tag.fp-worried { fill: var(--color-danger-text); }
 .hero-fig.anim .fp-lead { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 900ms var(--ease-out) both; animation-delay: calc(450ms + var(--d, 0ms) + var(--age, 0ms)); }
 .hero-fig.anim .fp-dot { transform-box: fill-box; transform-origin: center; animation: pop 300ms var(--ease-out) both; animation-delay: calc(300ms + var(--age, 0ms)); }
 .hero-fig.anim .fp-tag { animation: fade 400ms var(--ease-out) both; animation-delay: calc(1250ms + var(--age, 0ms)); }
@@ -516,10 +527,19 @@ body[data-step="0"] .story { display: block; min-height: 0; overflow-y: auto; pa
 .tb .tb-cell b { font-size: var(--text-sm); line-height: 19px; }
 .tb .tb-wait { background: var(--color-amber-soft); }
 .tb .tb-wait > span, .tb .tb-wait b { color: var(--color-amber-text); }
+.tb .tb-approved { position: relative; align-content: start; }
+.tb .tb-approved .stamp { justify-self: start; max-width: 100%; margin-top: 3px; font-size: 10.5px; padding: 1px 6px; letter-spacing: .05em; white-space: normal; rotate: -4deg; }
 .fig-note { font-size: 10.5px; line-height: 15px; letter-spacing: .04em; color: var(--color-text-secondary); text-transform: none; }
 
 @media (min-width: 901px) {
   .suggest { flex-wrap: wrap; overflow: visible; -webkit-mask-image: none; mask-image: none; scrollbar-width: thin; }
+  body.chat-started .suggest { flex-wrap: nowrap; overflow-x: auto; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); }
+  /* D1: at step 2 the whole card fits: no chat header, no trace, no avatar column for that reply */
+  body[data-step="2"] .m-head, body[data-step="2"] .bot:has(.ring-card) .trace { display: none; }
+  body[data-step="2"] .bot:has(.ring-card) { grid-template-columns: minmax(0, 1fr); }
+  body[data-step="2"] .bot:has(.ring-card) > .avatar { display: none; }
+  body[data-step="2"] .bot:has(.ring-card) > :not(.avatar) { grid-column: 1; }
+  body[data-step="2"] .rb.ring-card, body[data-step="2"] .bot:has(.ring-card) .answer { max-width: none; }
   .switch-row { display: none; }
   body[data-step="2"] .composer, body[data-step="2"] .fiction-note { display: none; }   /* room for the read back card */
 }
@@ -535,10 +555,27 @@ body[data-step="0"] .story { display: block; min-height: 0; overflow-y: auto; pa
    ===================================================================== */
 @media (max-height: 760px) and (min-width: 901px) {
   .crm-desc { display: none; }
+  .story { min-height: 164px; }
+  body[data-step="2"] .thread { padding-bottom: var(--space-3); }
+  body[data-step="2"] .answer { font-size: var(--text-base); line-height: 21px; }
+  body[data-step="2"] .rb-kicker { display: none; }   /* the title and the pill say it; the card needs the room */
+  body[data-step="2"] .rb { --text-base: 13px; }
+  body[data-step="2"] .rows, body[data-step="2"] .rb-list, body[data-step="2"] .rb-tasks li { line-height: 18px; }
+  body[data-step="2"] .rows { gap: 3px var(--space-3); }
+  body[data-step="2"] .rows dt { line-height: 18px; }
+  body[data-step="2"] .rb-body.two { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  body[data-step="2"] .rb .time-box small { font-size: 11.5px; line-height: 15px; }
+  .story-quote .quote-text { -webkit-line-clamp: 1; }
+  .story-list.one { grid-template-columns: repeat(2, minmax(0, max-content)); }
+  body[data-step="2"] .broker-pane > .pane-eyebrow { display: none; }
+  body[data-step="2"] .thread { padding-top: var(--space-3); gap: var(--space-3); }
+  .rb-col { padding: 10px 16px; gap: var(--space-2); }
+  .rb-head { padding: 8px 16px; }
+  .time-box, .tb-cell { padding: 8px 16px 9px; }
   .broker-pane { padding-top: var(--space-3); }
   .thread { padding-top: var(--space-4); gap: var(--space-4); }
   .fiction-note { padding: var(--space-2); }
-  .story { min-height: 118px; padding-top: var(--space-3); padding-bottom: var(--space-3); }
+  .story { padding-top: var(--space-3); padding-bottom: var(--space-3); }
   .story-title { font-size: var(--text-2xl); line-height: var(--leading-2xl); }
   .story-text { font-size: var(--text-md); line-height: 22px; }
   .m-head { min-height: 44px; padding-top: 6px; padding-bottom: 6px; }
@@ -562,6 +599,9 @@ body[data-step="0"] .story { display: block; min-height: 0; overflow-y: auto; pa
   .topbar { grid-template-columns: minmax(0, 1fr) auto; padding: 0 var(--space-2) 0 var(--space-4); gap: var(--space-3); }
   .topbar > div:nth-child(2) { display: none; }
   .brand-mark { width: 30px; height: 30px; }
+  .brand-sub .sub-long { display: none; }
+  .brand-sub .sub-short { display: inline; }
+  .m-head { display: none; }   /* the story sheet or the free chat row says who is signed in */
   .phone-only { display: flex !important; }
   .top-actions { gap: 0; }
   .top-actions .btn span { display: none; }
@@ -593,7 +633,8 @@ body[data-step="0"] .story { display: block; min-height: 0; overflow-y: auto; pa
   .crm-head .pane-eyebrow, .crm-desc { display: none; }
   .panel { padding: var(--space-3) var(--space-4) var(--space-8); }
   .pipe-cell { padding: 6px 7px 7px; }
-  .pipe-k { font-size: 8px; letter-spacing: 0; }
+  .pipe-k { font-size: 10px; letter-spacing: 0; }
+  .pipe-cell em, .saved-kind { font-size: 10px; }
   .pipe-cell b { font-size: 17px; line-height: 21px; }
   .log > li { grid-template-columns: 60px minmax(0, 1fr); }
   .log > li .pill { grid-column: 2; justify-self: start; }
@@ -645,6 +686,9 @@ body[data-step="0"] .story { display: block; min-height: 0; overflow-y: auto; pa
   body[data-step="2"] .bot:has(.ring-card) > .avatar, body[data-step="2"] .bot:has(.ring-card) .trace,
   body[data-step="2"] .bot:has(.ring-card) .bot-name { display: none; }
   body[data-step="2"] .bot:has(.ring-card) > :not(.avatar) { grid-column: 1; }
+  body[data-step="2"] .rb-kicker { display: none; }   /* the pill says it is not saved yet */
+  body[data-step="2"] .rb-sum { font-size: var(--text-md); line-height: 20px; }
+  body[data-step="2"] .bot:has(.ring-card) .answer { font-size: var(--text-base); line-height: 20px; }
   .skill-extra { display: none; }
 
   /* the first screen on a phone: the copy, then the drawing under it */
@@ -665,6 +709,12 @@ body[data-step="0"] .story { display: block; min-height: 0; overflow-y: auto; pa
   .hero-points li + li { border-left: 0; border-top: 1px solid var(--color-border); }
   .hero-points span { padding-top: 1px; }
   .hero-side { flex-basis: 100%; }
+  /* the drawing comes right after the buttons, before the 01 02 03 points */
+  .hero { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: var(--space-5); }
+  .hero-copy { display: contents; }
+  .hero-copy > * { order: 0; }
+  .hero-side { order: 1; margin-top: var(--space-2); }
+  .hero-points { order: 2; margin-top: 0; }
   .fp-long { display: none; }
   .fp-short { display: inline; font-size: 20px; letter-spacing: .04em; }
   .fp-tag { font-size: 17px; stroke-width: 6px; }
@@ -687,16 +737,36 @@ body[data-step="0"] .story { display: block; min-height: 0; overflow-y: auto; pa
 }
 @media (max-width: 900px) and (max-height: 700px) {
   .story { max-height: 50vh; }
-  .rb-sum { display: none; }   /* the summary is also the note's first row; the card needs the room */
 }
 @media (max-width: 420px) {
   .pill-long { display: none; }
   .pill-short { display: inline; }
   .rb-count { display: none; }
+  .pk-long { display: none; }
+  .pk-short { display: inline; }
   .pipe-cell { padding: 6px 5px 7px; }
   .pipe-cell em { display: none; }   /* the shading and the top rule mark it; screen readers get the words */
   .rec-head { grid-template-columns: minmax(0, 1fr); }
   .rec-head .stamp { justify-self: start; margin: 2px 0 0 2px; }
-  .time-box > span { font-size: 9px; letter-spacing: .03em; }
+  .time-box > span { font-size: 10px; letter-spacing: .03em; }
   .story-headline { font-size: 29px; }
+}
+@media (max-width: 380px) {
+  .story-headline { font-size: 27px; }
+}
+
+.sub-short, .pk-short { display: none; }
+@media (max-width: 900px) {
+  /* step 2 on a phone: the amber "when it happened" cell and the flags sit above Confirm */
+  .rb .tb-flags {
+    display: flex; flex: 1 1 100%; align-items: center; gap: var(--space-1-5); min-width: 0; padding: 4px 12px; border-left: 0;
+    border-top: 1px solid var(--color-border); background: var(--color-amber-soft); color: var(--color-amber-text); font-size: var(--text-xs); line-height: 16px;
+  }
+  .rb .tb-flags .i { width: 13px; height: 13px; flex: none; }
+  .rb .tb-flags span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .story-quote .quote-text { -webkit-line-clamp: 3; }
+}
+@media (min-width: 901px) and (max-width: 1300px) {
+  .pk-long { display: none; }
+  .pk-short { display: inline; }
 }

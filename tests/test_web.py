@@ -50,7 +50,7 @@ def test_the_story_date_is_always_an_exact_friday_ahead():
 
 def test_the_whole_story_over_http(client):
     s = story(__import__("datetime").date.today())
-    out = say(client, client.post("/api/new").json()["session"], s["voice_note"])
+    out = say(client, client.post("/api/new", json={}).json()["session"], s["voice_note"])
     write = out["view"]["pending"][0]
     out = send(client, out["session"], {"type": "confirm", "write_id": write["id"], "hash": write["hash"]})
     assert out["view"]["metrics"]["writes_saved"] == 1 and out["view"]["transcript"][-1]["notice"] == "saved"
@@ -70,7 +70,7 @@ def test_a_new_chat_can_be_signed_in_as_another_broker(client):
 
 
 def test_the_page_can_reload_and_show_the_same_chat(client):
-    out = say(client, client.post("/api/new").json()["session"], "Give me the weekly pipeline summary.")
+    out = say(client, client.post("/api/new", json={}).json()["session"], "Give me the weekly pipeline summary.")
     again = send(client, out["session"], {"type": "view"})
     assert again["view"]["transcript"] == out["view"]["transcript"] and again["session"] == out["session"]
 
@@ -90,7 +90,7 @@ def test_a_broken_session_asks_the_page_to_start_again(client):
     ({"type": "broker", "text": "x" * 1501}, "can't be sent"),
 ])
 def test_impossible_actions_are_explained(client, action, message):
-    session = client.post("/api/new").json()["session"]
+    session = client.post("/api/new", json={}).json()["session"]
     res = client.post("/api/step", json={"session": session, "action": action})
     assert res.status_code == 409 and res.json()["error"] == "action" and message in res.json()["message"]
 
@@ -118,7 +118,7 @@ def test_a_visitor_over_the_live_limit_is_moved_to_the_fixed_rules(monkeypatch):
     monkeypatch.setattr("teamos.web.PER_VISITOR", (1, 600))
     live = ScriptedModel([text("Hi from Claude.")], [text("Hi again from Claude.")])
     client = TestClient(create_app(Agent(live=live)))
-    first = say(client, client.post("/api/new").json()["session"], "Hello", live=True)
+    first = say(client, client.post("/api/new", json={}).json()["session"], "Hello", live=True)
     assert first["view"]["transcript"][-1]["mode"] == "live"
     second = say(client, first["session"], "Give me the weekly pipeline summary.", live=True)
     assert second["view"]["transcript"][-1]["mode"] == "guided" and len(live.calls) == 1
@@ -127,14 +127,14 @@ def test_a_visitor_over_the_live_limit_is_moved_to_the_fixed_rules(monkeypatch):
 def test_the_page_can_ask_for_the_fixed_rules(client):
     live = ScriptedModel([text("Hi from Claude.")])
     client = TestClient(create_app(Agent(live=live)))
-    out = say(client, client.post("/api/new").json()["session"], "Hello", live=False)
+    out = say(client, client.post("/api/new", json={}).json()["session"], "Hello", live=False)
     assert out["view"]["transcript"][-1]["mode"] == "guided" and not live.calls
 
 
 def test_every_kind_of_request_is_counted_per_visitor(monkeypatch):
     monkeypatch.setattr("teamos.web.PER_VISITOR_REQUESTS", (3, 600))
     client = TestClient(create_app(Agent()))
-    session = client.post("/api/new").json()["session"]
+    session = client.post("/api/new", json={}).json()["session"]
     codes = [client.post("/api/step", json={"session": session, "action": {"type": "view"}}).status_code for _ in range(4)]
     assert codes == [200, 200, 200, 409]
 
@@ -152,7 +152,7 @@ def test_visitors_are_counted_separately_and_concurrency_is_capped():
 def test_behind_vercel_the_visitor_is_the_forwarded_client(monkeypatch):
     monkeypatch.setattr("teamos.web.PER_VISITOR_REQUESTS", (1, 600))
     client = TestClient(create_app(Agent()))
-    session = client.post("/api/new").json()["session"]
+    session = client.post("/api/new", json={}).json()["session"]
     body = {"session": session, "action": {"type": "view"}}
     # Off Vercel a client cannot pick its own address with a header.
     assert client.post("/api/step", json=body, headers={"x-forwarded-for": "1.1.1.1"}).status_code == 200
@@ -231,7 +231,7 @@ def test_a_slow_model_call_does_not_block_other_visitors():
     server = serve(create_app(Agent(live=Slow())), port)
     try:
         base = f"http://127.0.0.1:{port}"
-        session = httpx.post(base + "/api/new").json()["session"]
+        session = httpx.post(base + "/api/new", json={}).json()["session"]
         worker = threading.Thread(target=lambda: httpx.post(base + "/api/step", timeout=10, json={
             "session": session, "action": {"type": "broker", "text": "Hello"}, "live": True}))
         with httpx.Client(base_url=base) as other:  # made before timing: creating a client is slow on Windows
@@ -298,3 +298,65 @@ def test_the_page_gets_the_same_security_headers_here_as_on_vercel(client):
     assert "script-src 'self';" in csp and "frame-ancestors 'none'" in csp and "unsafe-eval" not in csp
     for path in ("/", "/app.js", "/api/config"):
         assert client.get(path).headers["content-security-policy"] == csp
+
+
+# ------------------------------------------------------------------ requests from other sites, IPv6 visitors
+@pytest.mark.parametrize("path", ["/api/new", "/api/step"])
+@pytest.mark.parametrize("content_type", [None, "text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x"])
+def test_api_posts_that_are_not_json_are_refused(client, path, content_type):
+    headers = {"Content-Type": content_type} if content_type else {}
+    res = client.post(path, content=b'{"session": {}, "action": {"type": "view"}}', headers=headers)
+    assert res.status_code == 415 and res.json()["error"] == "request" and len(res.json()["message"]) < 80
+    assert "frame-ancestors 'none'" in res.headers["content-security-policy"]
+
+
+@pytest.mark.parametrize("path", ["/api/new", "/api/step"])
+def test_api_posts_marked_cross_site_by_the_browser_are_refused(client, path):
+    res = client.post(path, json={}, headers={"Sec-Fetch-Site": "cross-site"})
+    assert res.status_code == 403 and res.json()["error"] == "forbidden"
+    assert client.post(path, content=b"{}", headers={"Sec-Fetch-Site": "cross-site", "Content-Type": "text/plain"}).status_code == 403
+
+
+@pytest.mark.parametrize("fetch_site", [None, "same-origin", "same-site", "none"])
+def test_the_page_own_json_posts_still_work(client, fetch_site):
+    headers = {"Content-Type": "application/json; charset=utf-8"} | ({"Sec-Fetch-Site": fetch_site} if fetch_site else {})
+    new = client.post("/api/new", content=b'{"broker": "B-2"}', headers=headers)
+    assert new.status_code == 200
+    step = client.post("/api/step", json={"session": new.json()["session"], "action": {"type": "view"}}, headers=headers)
+    assert step.status_code == 200
+    assert client.get("/api/config", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 200  # reading is not refused
+
+
+def test_a_refused_request_reaches_neither_the_model_nor_the_limits(monkeypatch):
+    import json
+    monkeypatch.setattr("teamos.web.PER_VISITOR_REQUESTS", (1, 600))
+    live = ScriptedModel([text("Hi from Claude.")])
+    client = TestClient(create_app(Agent(live=live)))
+    session = client.post("/api/new", json={}).json()["session"]
+    body = {"session": session, "action": {"type": "broker", "text": "Hello"}, "live": True}
+    assert client.post("/api/step", json=body, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    assert client.post("/api/step", content=json.dumps(body), headers={"Content-Type": "text/plain"}).status_code == 415
+    assert live.calls == []
+    assert client.post("/api/step", json=body).status_code == 200  # the one allowed request was not used up
+
+
+def test_ipv6_visitors_are_counted_by_their_64(monkeypatch):
+    from teamos.web import visitor_key
+    assert visitor_key("2001:db8:1:2:aaaa::1") == visitor_key("2001:db8:1:2:ffff::9") == "2001:db8:1:2::/64"
+    assert visitor_key("[2001:db8:1:2::1]") == "2001:db8:1:2::/64"
+    assert visitor_key("2001:db8:1:3::1") != visitor_key("2001:db8:1:2::1")
+    assert visitor_key("203.0.113.7") == "203.0.113.7" and visitor_key("::ffff:203.0.113.7") == "203.0.113.7"
+    assert visitor_key("203.0.113.8") != visitor_key("203.0.113.7")  # IPv4 stays one address per visitor
+    assert visitor_key("not an address") == "not an address"
+    monkeypatch.setattr("teamos.web.PER_VISITOR_REQUESTS", (2, 600))
+    client = TestClient(create_app(Agent()))
+    session = client.post("/api/new", json={}).json()["session"]
+    monkeypatch.setenv("VERCEL", "1")
+
+    def step(address: str) -> int:
+        return client.post("/api/step", json={"session": session, "action": {"type": "view"}},
+                           headers={"x-vercel-forwarded-for": address}).status_code
+
+    assert [step(f"2001:db8:5:6::{i}") for i in range(1, 4)] == [200, 200, 409]  # a new address in the same /64 is the same visitor
+    assert step("2001:db8:5:7::1") == 200  # the next /64 is someone else
+    assert [step(f"198.51.100.{i}") for i in range(1, 4)] == [200, 200, 200]

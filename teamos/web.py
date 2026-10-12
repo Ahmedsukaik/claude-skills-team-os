@@ -8,6 +8,7 @@ Without a key, or when the key's budget is used up, the fixed rules answer inste
 """
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import os
@@ -134,6 +135,31 @@ def _depth(value: Any, level: int = 0) -> int:
     return level
 
 
+def visitor_key(address: str) -> str:
+    """The key the limits count by: an IPv4 address as it is, an IPv6 address by its /64 network
+    (one home or phone connection usually holds a whole /64, so each address in it is the same visitor)."""
+    try:
+        ip = ipaddress.ip_address(address.strip("[]"))
+    except ValueError:
+        return address[:64]
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is None:
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False))
+    return str(ip.ipv4_mapped or ip) if isinstance(ip, ipaddress.IPv6Address) else str(ip)
+
+
+def cross_site_refusal(request: Request) -> JSONResponse | None:
+    """Every POST to the API must be JSON sent by the demo page itself. A form or script on another
+    site can only send JSON after the browser asks this server first (and it never says yes), and
+    browsers mark requests from another site with Sec-Fetch-Site. None lets the request through."""
+    if request.method in ("GET", "HEAD", "OPTIONS") or not request.url.path.startswith("/api/"):
+        return None
+    if request.headers.get("sec-fetch-site", "").strip().lower() == "cross-site":
+        return JSONResponse({"error": "forbidden", "message": "Requests from other sites are not accepted."}, status_code=403)
+    if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+        return JSONResponse({"error": "request", "message": "Send the request as JSON."}, status_code=415)
+    return None
+
+
 def live_model_from_env() -> ClaudeModel | None:
     if os.environ.get("TEAMOS_LIVE_AI", "on").lower() in ("off", "0", "false", "no"):
         return None
@@ -168,6 +194,11 @@ def create_app(agent: Agent | None = None, serve_static: bool = True) -> FastAPI
     app.state.limiter = Limiter()
 
     @app.middleware("http")
+    async def same_site_json_only(request: Request, call_next: Any) -> Any:
+        refused = cross_site_refusal(request)
+        return refused if refused is not None else await call_next(request)
+
+    @app.middleware("http")  # added last, so it runs first and also covers the refusals above
     async def security_headers(request: Request, call_next: Any) -> Any:
         response = await call_next(request)
         for key, value in SECURITY_HEADERS.items():
@@ -175,13 +206,13 @@ def create_app(agent: Agent | None = None, serve_static: bool = True) -> FastAPI
         return response
 
     def visitor(request: Request) -> str:
-        """The visitor's address. Behind Vercel, its own headers carry the real client; anywhere
+        """The visitor, for the limits. Behind Vercel, its own headers carry the real client; anywhere
         else, a client could write X-Forwarded-For itself, so the connection's address is used."""
         if os.environ.get("VERCEL"):
             forwarded = request.headers.get("x-vercel-forwarded-for") or request.headers.get("x-forwarded-for", "")
             if forwarded.strip():
-                return forwarded.split(",")[0].strip()[:64]
-        return request.client.host if request.client else "unknown"
+                return visitor_key(forwarded.split(",")[0].strip()[:64])
+        return visitor_key(request.client.host if request.client else "unknown")
 
     async def body(request: Request) -> dict[str, Any]:
         declared = request.headers.get("content-length", "")
